@@ -160,7 +160,21 @@
     "title": "Learning"
   },
   "support": {
-    "title": "Support"
+    "title": "Support",
+    "faq": "FAQ",
+    "myInquiries": "My Inquiries",
+    "submitInquiry": "Submit Inquiry",
+    "noFaqs": "No FAQs available yet.",
+    "noInquiries": "You haven't submitted any inquiries yet.",
+    "submitFirst": "Submit your first inquiry",
+    "submitted": "Submitted",
+    "response": "Response",
+    "newInquiryTitle": "Submit a New Inquiry",
+    "subject": "Subject",
+    "subjectPlaceholder": "What is your inquiry about?",
+    "message": "Message",
+    "messagePlaceholder": "Describe your issue or question in detail...",
+    "submitting": "Submitting..."
   },
   "auth": {
     "login": "Login",
@@ -174,6 +188,9 @@
     "noAccount": "Don't have an account?",
     "forgotPassword": "Forgot Password?",
     "forgotPasswordDescription": "Enter your email and we'll notify an administrator to reset your password.",
+    "userType": "Account Type",
+    "userTypeUser": "User (General Member)",
+    "userTypeInstructor": "Instructor (Educator)",
     "currentPassword": "Current Password",
     "newPassword": "New Password",
     "changePassword": "Change Password",

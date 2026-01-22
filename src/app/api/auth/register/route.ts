@@ -9,6 +9,7 @@ const Body = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
+  role: z.enum(["user", "instructor"]).default("user"),
 });
 
 export async function POST(req: Request) {
@@ -16,14 +17,14 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(body);
   if (!parsed.success) return error("Invalid input", 400);
 
-  const { name, email, password } = parsed.data;
+  const { name, email, password, role } = parsed.data;
 
   await dbConnect();
   const existing = await User.findOne({ email }).lean();
   if (existing) return error("Email already registered", 409);
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await User.create({ name, email, passwordHash, role: "user" });
+  const user = await User.create({ name, email, passwordHash, role });
 
   const token = await signToken({ sub: String(user._id), email, name, role: user.role });
   setAuthCookie(token);

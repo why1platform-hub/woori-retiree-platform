@@ -160,7 +160,21 @@
     "title": "학습"
   },
   "support": {
-    "title": "지원"
+    "title": "지원",
+    "faq": "자주 묻는 질문",
+    "myInquiries": "내 문의",
+    "submitInquiry": "문의하기",
+    "noFaqs": "아직 FAQ가 없습니다.",
+    "noInquiries": "아직 문의 내역이 없습니다.",
+    "submitFirst": "첫 번째 문의를 작성하세요",
+    "submitted": "제출일",
+    "response": "답변",
+    "newInquiryTitle": "새 문의 작성",
+    "subject": "제목",
+    "subjectPlaceholder": "문의 내용을 간략히 적어주세요",
+    "message": "내용",
+    "messagePlaceholder": "질문이나 문제를 자세히 설명해 주세요...",
+    "submitting": "제출 중..."
   },
   "auth": {
     "login": "로그인",
@@ -174,6 +188,9 @@
     "noAccount": "계정이 없으신가요?",
     "forgotPassword": "비밀번호를 잊으셨나요?",
     "forgotPasswordDescription": "이메일을 입력하시면 관리자에게 비밀번호 재설정을 요청합니다.",
+    "userType": "계정 유형",
+    "userTypeUser": "사용자 (일반 회원)",
+    "userTypeInstructor": "강사 (교육자)",
     "currentPassword": "현재 비밀번호",
     "newPassword": "새 비밀번호",
     "changePassword": "비밀번호 변경",

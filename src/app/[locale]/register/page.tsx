@@ -14,6 +14,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState<"user" | "instructor">("user");
   const [msg, setMsg] = useState<string | null>(null);
 
   async function handleRegister(e: React.FormEvent) {
@@ -28,7 +29,7 @@ export default function RegisterPage() {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, role }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -50,7 +51,19 @@ export default function RegisterPage() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="rounded border px-3 py-2"
+          required
         />
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">{t('userType')}</label>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as "user" | "instructor")}
+            className="w-full rounded border px-3 py-2"
+          >
+            <option value="user">{t('userTypeUser')}</option>
+            <option value="instructor">{t('userTypeInstructor')}</option>
+          </select>
+        </div>
         <input
           type="email"
           placeholder={t('email')}

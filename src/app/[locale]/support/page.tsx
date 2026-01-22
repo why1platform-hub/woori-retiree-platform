@@ -146,7 +146,7 @@ export default function SupportPage() {
               : "text-gray-600 hover:text-gray-900"
           }`}
         >
-          FAQ ({faqs.length})
+          {t("faq")} ({faqs.length})
         </button>
         <button
           onClick={() => setActiveTab("inquiries")}
@@ -156,7 +156,7 @@ export default function SupportPage() {
               : "text-gray-600 hover:text-gray-900"
           }`}
         >
-          My Inquiries ({inquiries.length})
+          {t("myInquiries")} ({inquiries.length})
         </button>
         <button
           onClick={() => setActiveTab("new")}
@@ -166,7 +166,7 @@ export default function SupportPage() {
               : "text-gray-600 hover:text-gray-900"
           }`}
         >
-          Submit Inquiry
+          {t("submitInquiry")}
         </button>
       </div>
 
@@ -175,7 +175,7 @@ export default function SupportPage() {
         <>
           {faqs.length === 0 ? (
             <Card>
-              <p className="text-gray-500">No FAQs available yet.</p>
+              <p className="text-gray-500">{t("noFaqs")}</p>
             </Card>
           ) : (
             <div className="grid gap-2">
@@ -210,12 +210,12 @@ export default function SupportPage() {
         <>
           {inquiries.length === 0 ? (
             <Card>
-              <p className="text-gray-500">You haven&apos;t submitted any inquiries yet.</p>
+              <p className="text-gray-500">{t("noInquiries")}</p>
               <button
                 onClick={() => setActiveTab("new")}
                 className="mt-3 text-blue-600 hover:underline"
               >
-                Submit your first inquiry
+                {t("submitFirst")}
               </button>
             </Card>
           ) : (
@@ -232,12 +232,12 @@ export default function SupportPage() {
                       </div>
                       <p className="mt-2 text-sm text-gray-700">{inquiry.message}</p>
                       <p className="mt-2 text-xs text-gray-400">
-                        Submitted: {new Date(inquiry.createdAt).toLocaleDateString()}
+                        {t("submitted")}: {new Date(inquiry.createdAt).toLocaleDateString()}
                       </p>
 
                       {inquiry.reply && (
                         <div className="mt-4 rounded bg-blue-50 p-3">
-                          <p className="text-sm font-medium text-blue-800">Response:</p>
+                          <p className="text-sm font-medium text-blue-800">{t("response")}:</p>
                           <p className="mt-1 text-sm text-blue-700">{inquiry.reply}</p>
                         </div>
                       )}
@@ -260,30 +260,30 @@ export default function SupportPage() {
       {/* New Inquiry Tab */}
       {activeTab === "new" && (
         <Card>
-          <h3 className="mb-4 font-semibold">Submit a New Inquiry</h3>
+          <h3 className="mb-4 font-semibold">{t("newInquiryTitle")}</h3>
           <form onSubmit={handleSubmitInquiry} className="grid gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium">Subject</label>
+              <label className="mb-1 block text-sm font-medium">{t("subject")}</label>
               <Input
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                placeholder="What is your inquiry about?"
+                placeholder={t("subjectPlaceholder")}
                 required
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Message</label>
+              <label className="mb-1 block text-sm font-medium">{t("message")}</label>
               <Textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Describe your issue or question in detail..."
+                placeholder={t("messagePlaceholder")}
                 rows={5}
                 required
               />
             </div>
             <Button type="submit" disabled={submitting}>
-              {submitting ? "Submitting..." : "Submit Inquiry"}
+              {submitting ? t("submitting") : t("submitInquiry")}
             </Button>
           </form>
         </Card>
