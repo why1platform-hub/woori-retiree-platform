@@ -1,0 +1,31 @@
+node_modules
+.next
+.env.local
+.env
+.env.production.local
+.DS_Store
+*.log
+.vercel
+coverage
+.turbo
+tsconfig.tsbuildinfo
+
+# Temporary files
+tmpclaude-*
+*.tmp
+nul
+
+# Claude settings
+.claude/
+
+# Debug/test files
+cookies.txt
+headers.txt
+body.txt
+instructor.txt
+instructor_cookies.txt
+
+# Documentation (optional - remove these lines if you want docs)
+*.md
+!README.md
+!.env.example

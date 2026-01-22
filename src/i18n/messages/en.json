@@ -1,0 +1,324 @@
+{
+  "home": {
+    "welcome": "Welcome",
+    "description": "This is a deploy-friendly MERN-lite platform for retiree programs, consultations, learning, and jobs.",
+    "goToDashboard": "Go to Dashboard",
+    "features": "Features",
+    "featuresList": {
+      "programs": "Programs and workshops",
+      "jobs": "Job listings",
+      "learning": "Learning resources",
+      "consultations": "Consultation bookings",
+      "support": "Support and FAQ"
+    }
+  },
+  "site": {
+    "title": "Woori Retiree Platform"
+  },
+  "nav": {
+    "programs": "Programs",
+    "jobs": "Jobs",
+    "learning": "Learning",
+    "consultation": "Consultation",
+    "myActivity": "My Activity",
+    "support": "Support",
+    "instructor": "Instructor",
+    "admin": "Admin",
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout",
+    "profile": "Profile"
+  },
+  "admin": {
+    "dashboard": "Admin Dashboard",
+    "manageDescription": "Manage users, notices, programs, jobs, courses, and FAQs.",
+    "users": {
+      "title": "Create User",
+      "name": "Name",
+      "email": "Email",
+      "password": "Password",
+      "role": "Role",
+      "phone": "Phone",
+      "organization": "Organization",
+      "bio": "Bio",
+      "create": "Create",
+      "usersList": "Users",
+      "edit": "Edit",
+      "resetPassword": "Reset Pwd",
+      "saveRole": "Save",
+      "cancel": "Cancel"
+    },
+    "notices": {
+      "title": "Create Notice",
+      "noticeTitle": "Title",
+      "body": "Body",
+      "badge": "Badge",
+      "publish": "Publish",
+      "noticesList": "Notices",
+      "info": "info",
+      "urgent": "urgent",
+      "delete": "Delete"
+    },
+    "programs": {
+      "title": "Create Program",
+      "name": "Name",
+      "category": "Category",
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "recruitStart": "Recruit Start",
+      "recruitEnd": "Recruit End",
+      "description": "Description",
+      "create": "Create",
+      "programsList": "Programs",
+      "status": "Status",
+      "upcoming": "upcoming",
+      "open": "open",
+      "closed": "closed",
+      "delete": "Delete",
+      "view": "View",
+      "applicants": "Applicants",
+      "exportCSV": "Export CSV",
+      "close": "Close",
+      "saveChanges": "Save Changes"
+    },
+    "jobs": {
+      "title": "Create Job",
+      "company": "Company",
+      "jobTitle": "Title",
+      "location": "Location",
+      "employmentType": "Employment Type",
+      "salary": "Salary",
+      "requirements": "Requirements",
+      "applyUrl": "Apply URL (optional)",
+      "create": "Create",
+      "jobsList": "Jobs",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "courses": {
+      "title": "Courses / Learning",
+      "createdByInstructors": "Courses are created by instructors. You can edit or delete any course here.",
+      "courseTitle": "Title",
+      "category": "Category",
+      "duration": "Duration (min)",
+      "views": "Views",
+      "thumbnailUrl": "Thumbnail URL",
+      "videoUrl": "Video URL",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "cancel": "Cancel",
+      "noCourses": "No courses yet."
+    },
+    "faqs": {
+      "title": "Create FAQ",
+      "question": "Question",
+      "answer": "Answer",
+      "addFaq": "Add FAQ",
+      "faqsList": "FAQs",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "emailRequests": {
+      "title": "Email Change Requests",
+      "noRequests": "No email change requests.",
+      "requester": "Requester",
+      "newEmail": "New Email",
+      "createdAt": "Requested At",
+      "status": "Status",
+      "actions": "Actions",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approvedMsg": "Email change approved.",
+      "rejectedMsg": "Email change rejected.",
+      "confirmReject": "Reject this email change request?",
+      "backToAdmin": "Back to Admin",
+      "loading": "Loading..."
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "notices": "Notices",
+    "requestPasswordReset": "Request Password Reset",
+    "passwordResetRequested": "Password reset requested. Please contact admin.",
+    "noNotices": "No notices at this time.",
+    "loading": "Loading..."
+  },
+  "programs": {
+    "title": "Programs",
+    "apply": "Apply",
+    "unavailable": "Unavailable"
+  },
+  "jobs": {
+    "title": "Jobs"
+  },
+  "learning": {
+    "title": "Learning"
+  },
+  "support": {
+    "title": "Support"
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Submit",
+    "name": "Name",
+    "confirmPassword": "Confirm Password",
+    "alreadyHaveAccount": "Already have an account?",
+    "noAccount": "Don't have an account?",
+    "forgotPassword": "Forgot Password?",
+    "forgotPasswordDescription": "Enter your email and we'll notify an administrator to reset your password.",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "changePassword": "Change Password",
+    "passwordChanged": "Password changed successfully",
+    "passwordChangeFailed": "Unable to change password",
+    "backToLogin": "Back to Login"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "failed": "Failed"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "noNotifications": "No notifications",
+    "approve": "Approve"
+  },
+  "profile": {
+    "title": "Profile",
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "bio": "Bio",
+    "organization": "Organization (optional)",
+    "newEmailPlaceholder": "New email (request change)",
+    "saveProfile": "Save Profile",
+    "requestEmailChange": "Request Email Change",
+    "saved": "Saved",
+    "enterEmail": "Enter new email in the email field and click Request Email Change",
+    "emailRequested": "Email change requested — awaiting admin approval",
+    "changePassword": "Change password",
+    "changePasswordButton": "Change Password"
+  },
+  "instructor": {
+    "dashboard": "Instructor Dashboard",
+    "manageDescription": "Manage your courses, resources, and consultation slots.",
+    "tabs": {
+      "courses": "My Courses ({count})",
+      "resources": "Resources ({count})",
+      "slots": "Consultation Slots ({count})",
+      "bookings": "Bookings ({count})"
+    },
+    "createCourse": {
+      "title": "Create New Course",
+      "button": "Create Course"
+    },
+    "placeholders": {
+      "courseTitle": "Course Title",
+      "description": "Description",
+      "duration": "Duration (min)",
+      "thumbnailUrl": "Thumbnail URL (optional)",
+      "videoUrl": "Video URL"
+    },
+    "myCourses": {
+      "title": "My Courses"
+    },
+    "categories": {
+      "finance": "Finance",
+      "realestate": "Real Estate",
+      "startup": "Startup",
+      "social": "Social"
+    },
+    "loading": "Loading...",
+    "resources": {
+      "uploadTitle": "Upload New Resource",
+      "resourceTitle": "Resource Title",
+      "description": "Description",
+      "fileUrl": "File URL (e.g., Google Drive link)",
+      "fileSize": "File Size (bytes)",
+      "upload": "Upload Resource",
+      "myResources": "My Resources",
+      "noResources": "No resources yet.",
+      "downloads": "downloads"
+    },
+    "slots": {
+      "createTitle": "Create Consultation Slots",
+      "createDescription": "Set your availability. 30-minute slots will be automatically generated.",
+      "dateRange": "Date Range",
+      "startDate": "Start Date",
+      "finishDate": "Finish Date",
+      "startTime": "Start Time",
+      "endTime": "End Time",
+      "topic": "Topic",
+      "topicPlaceholder": "e.g., Career Advice",
+      "repeatDays": "Repeat on days (optional)",
+      "repeatWeeks": "Repeat for weeks",
+      "week1": "1 week",
+      "week2": "2 weeks",
+      "week4": "4 weeks",
+      "week8": "8 weeks",
+      "createButton": "Create Slots",
+      "mySlots": "My Consultation Slots",
+      "noSlots": "No slots created yet.",
+      "booked": "Booked",
+      "available": "Available",
+      "selectAll": "Select All",
+      "selected": "selected",
+      "deleteSelected": "Delete Selected",
+      "deleting": "Deleting...",
+      "selectAtLeastOne": "Please select at least one slot to delete.",
+      "confirmBulkDelete": "Confirm delete?",
+      "deletedCount": "Deleted.",
+      "expandAll": "Expand All",
+      "collapseAll": "Collapse All",
+      "slotsCount": "slots",
+      "statusApproved": "Approved",
+      "statusPending": "Pending"
+    },
+    "bookings": {
+      "title": "Consultation Bookings",
+      "noBookings": "No bookings yet.",
+      "student": "Student",
+      "meeting": "Meeting",
+      "meetingLinkPlaceholder": "Meeting Link (e.g., Zoom URL)",
+      "approve": "Approve",
+      "reject": "Reject",
+      "manage": "Manage"
+    },
+    "days": {
+      "sun": "Sun",
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat"
+    }
+  },
+  "consultations": {
+    "title": "Consultation",
+    "availableTimes": "Available times",
+    "noAvailableSlots": "No available slots for selected date.",
+    "startTime": "Start Time",
+    "endTime": "End Time",
+    "topic": "Topic",
+    "createSlots": "Create 30-min Slots",
+    "creating": "Creating...",
+    "startDate": "Start Date",
+    "repeatDays": "Repeat on Days (optional)",
+    "selectInstructor": "Select instructor (optional)"
+  }
+}
