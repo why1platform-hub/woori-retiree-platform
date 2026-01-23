@@ -16,7 +16,8 @@ export default function ProfilePage() {
       const res = await fetch('/api/me');
       if (res.ok) {
         const d = await res.json();
-        setForm({ name: d.name || '', phone: d.phone || '', bio: d.bio || '', email: d.email || '', organization: d.organization || '' });
+        const u = d.user || d;
+        setForm({ name: u.name || '', phone: u.phone || '', bio: u.bio || '', email: u.email || '', organization: u.organization || '' });
       }
       setLoading(false);
     }

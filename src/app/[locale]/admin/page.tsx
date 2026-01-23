@@ -19,6 +19,7 @@ interface User {
   bio?: string;
   organization?: string;
   createdAt?: string;
+  passwordResetRequested?: boolean;
 }
 
 interface Notice {
@@ -70,11 +71,11 @@ interface Faq {
 
 interface Inquiry {
   _id: string;
-  user: { name: string; email: string };
+  userId: { name: string; email: string };
   subject: string;
   message: string;
   status: string;
-  response?: string;
+  reply?: string;
   createdAt: string;
 }
 
@@ -156,38 +157,66 @@ export default function AdminPage() {
   const [slotEditForm, setSlotEditForm] = useState({ startsAt: "", endsAt: "", topic: "" });
   const [bookingEditForm, setBookingEditForm] = useState({ status: "", meetingLink: "", instructorId: "", slotId: "" });
 
-  useEffect(() => {
-    fetchAllData();
-  }, []);
+  const [loadedTabs, setLoadedTabs] = useState<Set<Tab>>(new Set());
 
-  async function fetchAllData() {
+  useEffect(() => {
+    fetchTabData(activeTab);
+  }, [activeTab]);
+
+  async function fetchTabData(tab: Tab) {
     setLoading(true);
     try {
-      const [usersRes, noticesRes, programsRes, jobsRes, coursesRes, faqsRes, inquiriesRes, slotsRes, bookingsRes, instructorsRes] = await Promise.all([
-        fetch("/api/admin/users"),
-        fetch("/api/notices"),
-        fetch("/api/programs"),
-        fetch("/api/jobs"),
-        fetch("/api/courses"),
-        fetch("/api/support/faq"),
-        fetch("/api/support/inquiries?all=true"),
-        fetch('/api/consultation/slots'),
-        fetch('/api/consultation/bookings'),
-        fetch('/api/instructors'),
-      ]);
-
-      if (usersRes.ok) setUsers((await usersRes.json()).users || []);
-      if (noticesRes.ok) setNotices((await noticesRes.json()).notices || []);
-      if (programsRes.ok) setPrograms((await programsRes.json()).programs || []);
-      if (jobsRes.ok) setJobs((await jobsRes.json()).jobs || []);
-      if (coursesRes.ok) setCourses((await coursesRes.json()).courses || []);
-      if (faqsRes.ok) setFaqs((await faqsRes.json()).faqs || []);
-      if (inquiriesRes.ok) setInquiries((await inquiriesRes.json()).inquiries || []);
-      if (slotsRes.ok) setSlots((await slotsRes.json()).slots || []);
-      if (bookingsRes.ok) setBookings((await bookingsRes.json()).bookings || []);
-      if (instructorsRes.ok) setInstructors((await instructorsRes.json()).instructors || []);
+      switch (tab) {
+        case "users": {
+          const res = await fetch("/api/admin/users");
+          if (res.ok) setUsers((await res.json()).users || []);
+          break;
+        }
+        case "notices": {
+          const res = await fetch("/api/notices");
+          if (res.ok) setNotices((await res.json()).notices || []);
+          break;
+        }
+        case "programs": {
+          const res = await fetch("/api/programs");
+          if (res.ok) setPrograms((await res.json()).programs || []);
+          break;
+        }
+        case "jobs": {
+          const res = await fetch("/api/jobs");
+          if (res.ok) setJobs((await res.json()).jobs || []);
+          break;
+        }
+        case "courses": {
+          const res = await fetch("/api/courses");
+          if (res.ok) setCourses((await res.json()).courses || []);
+          break;
+        }
+        case "faqs": {
+          const res = await fetch("/api/support/faq");
+          if (res.ok) setFaqs((await res.json()).faqs || []);
+          break;
+        }
+        case "inquiries": {
+          const res = await fetch("/api/support/inquiries?all=true");
+          if (res.ok) setInquiries((await res.json()).inquiries || []);
+          break;
+        }
+        case "consultations": {
+          const [slotsRes, bookingsRes, insRes] = await Promise.all([
+            fetch('/api/consultation/slots'),
+            fetch('/api/consultation/bookings'),
+            fetch('/api/instructors'),
+          ]);
+          if (slotsRes.ok) setSlots((await slotsRes.json()).slots || []);
+          if (bookingsRes.ok) setBookings((await bookingsRes.json()).bookings || []);
+          if (insRes.ok) setInstructors((await insRes.json()).instructors || []);
+          break;
+        }
+      }
+      setLoadedTabs(prev => new Set(prev).add(tab));
     } catch (error) {
-      console.error("Error fetching admin data:", error);
+      console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
@@ -234,7 +263,7 @@ export default function AdminPage() {
   };
 
   const handleResetPassword = async (userId: string) => {
-    if (!confirm("Reset password to default?")) return;
+    if (!confirm(locale === 'ko' ? '비밀번호를 초기화하시겠습니까?' : 'Reset password to default?')) return;
     const res = await fetch("/api/admin/users", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -242,7 +271,8 @@ export default function AdminPage() {
     });
     if (res.ok) {
       const data = await res.json();
-      alert(`Password reset to: ${data.newPassword}`);
+      setUsers(users.map(u => u._id === userId ? { ...u, passwordResetRequested: false } : u));
+      alert(locale === 'ko' ? `비밀번호가 초기화되었습니다: ${data.newPassword}` : `Password reset to: ${data.newPassword}`);
     }
   };
 
@@ -369,10 +399,10 @@ export default function AdminPage() {
     const res = await fetch("/api/support/inquiries", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inquiryId: id, response: inquiryResponse, status: "answered" }),
+      body: JSON.stringify({ inquiryId: id, reply: inquiryResponse }),
     });
     if (res.ok) {
-      setInquiries(inquiries.map(i => i._id === id ? { ...i, response: inquiryResponse, status: "answered" } : i));
+      setInquiries(inquiries.map(i => i._id === id ? { ...i, reply: inquiryResponse, status: "answered" } : i));
       setRespondingInquiry(null);
       setInquiryResponse("");
     }
@@ -437,25 +467,16 @@ export default function AdminPage() {
 
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: "settings", label: "Platform Settings" },
-    { key: "users", label: `Users (${users.length})` },
-    { key: "notices", label: `Notices (${notices.length})` },
-    { key: "programs", label: `Programs (${programs.length})` },
-    { key: "jobs", label: `Jobs (${jobs.length})` },
-    { key: "courses", label: `Courses (${courses.length})` },
-    { key: "faqs", label: `FAQs (${faqs.length})` },
-    { key: "inquiries", label: `Inquiries (${inquiries.length})` },
-    { key: "consultations", label: `Consultations (${bookings.length})` },
+    { key: "settings", label: locale === 'ko' ? '설정' : 'Settings' },
+    { key: "users", label: `${locale === 'ko' ? '사용자' : 'Users'}${loadedTabs.has('users') ? ` (${users.length})` : ''}` },
+    { key: "notices", label: `${locale === 'ko' ? '공지' : 'Notices'}${loadedTabs.has('notices') ? ` (${notices.length})` : ''}` },
+    { key: "programs", label: `${locale === 'ko' ? '프로그램' : 'Programs'}${loadedTabs.has('programs') ? ` (${programs.length})` : ''}` },
+    { key: "jobs", label: `${locale === 'ko' ? '채용' : 'Jobs'}${loadedTabs.has('jobs') ? ` (${jobs.length})` : ''}` },
+    { key: "courses", label: `${locale === 'ko' ? '강좌' : 'Courses'}${loadedTabs.has('courses') ? ` (${courses.length})` : ''}` },
+    { key: "faqs", label: `FAQ${loadedTabs.has('faqs') ? ` (${faqs.length})` : ''}` },
+    { key: "inquiries", label: `${locale === 'ko' ? '문의' : 'Inquiries'}${loadedTabs.has('inquiries') ? ` (${inquiries.length})` : ''}` },
+    { key: "consultations", label: `${locale === 'ko' ? '상담' : 'Consult'}${loadedTabs.has('consultations') ? ` (${bookings.length})` : ''}` },
   ];
-
-  if (loading) {
-    return (
-      <div className="grid gap-4">
-        <h1 className="text-2xl font-bold">{t("dashboard")}</h1>
-        <p className="text-gray-600">Loading admin data...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="grid gap-6">
@@ -480,6 +501,8 @@ export default function AdminPage() {
           </button>
         ))}
       </div>
+
+      {loading && <p className="text-gray-500 text-sm">{locale === 'ko' ? '로딩 중...' : 'Loading...'}</p>}
 
       {/* Platform Settings Tab */}
       {activeTab === "settings" && (
@@ -519,6 +542,9 @@ export default function AdminPage() {
                         <Badge tone={user.role === "superadmin" ? "orange" : user.role === "instructor" ? "blue" : "gray"}>
                           {user.role}
                         </Badge>
+                        {user.passwordResetRequested && (
+                          <Badge tone="orange">{locale === 'ko' ? '비밀번호 재설정 요청' : 'Password Reset Requested'}</Badge>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
                         <div><strong>{t("users.email")}:</strong> {user.email}</div>
@@ -894,11 +920,11 @@ export default function AdminPage() {
                           {inquiry.status}
                         </Badge>
                       </div>
-                      <p className="text-sm text-gray-500">From: {inquiry.user?.name} ({inquiry.user?.email})</p>
+                      <p className="text-sm text-gray-500">From: {inquiry.userId?.name} ({inquiry.userId?.email})</p>
                       <p className="text-sm text-gray-700 mt-2">{inquiry.message}</p>
-                      {inquiry.response && (
+                      {inquiry.reply && (
                         <div className="mt-2 bg-green-50 p-2 rounded text-sm">
-                          <strong>Response:</strong> {inquiry.response}
+                          <strong>Response:</strong> {inquiry.reply}
                         </div>
                       )}
                       {respondingInquiry === inquiry._id && (
@@ -939,7 +965,7 @@ export default function AdminPage() {
             <h3 className="mb-4 font-semibold">Create Slots</h3>
             <form onSubmit={handleCreateSlot} className="grid gap-3 sm:grid-cols-4">
               <select value={slotForm.instructorId} onChange={e => setSlotForm({...slotForm, instructorId: e.target.value})} className="rounded border px-3 py-2">
-                <option value="">{t('consultations.selectInstructor')}</option>
+                <option value="">{locale === 'ko' ? '강사 선택' : 'Select Instructor'}</option>
                 {instructors.map(ins => <option key={ins._id} value={ins._id}>{ins.name} ({ins.email})</option>)}
               </select>
               <Input type="date" value={slotForm.date} onChange={e => setSlotForm({...slotForm, date: e.target.value})} required />

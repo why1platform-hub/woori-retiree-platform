@@ -118,14 +118,33 @@ export function PlatformSettingsComponent() {
     await handleImageFile(file);
   };
 
+  const optimizeImage = (file: File, maxDim = 200, quality = 0.8): Promise<File> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob((blob) => {
+          resolve(new File([blob!], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' }));
+        }, 'image/webp', quality);
+      };
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const handleImageFile = async (file: File) => {
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       setMessage("Please select a valid image file");
       return;
     }
-
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setMessage("Image size must be less than 5MB");
       return;
@@ -133,8 +152,10 @@ export function PlatformSettingsComponent() {
 
     setUploading(true);
     try {
+      // Optimize: resize to max 200px and convert to WebP
+      const optimized = await optimizeImage(file);
       const formData = new FormData();
-      formData.append("logo", file);
+      formData.append("logo", optimized);
 
       const res = await fetch("/api/admin/settings/logo", {
         method: "POST",
@@ -143,13 +164,9 @@ export function PlatformSettingsComponent() {
 
       if (res.ok) {
         const data = await res.json();
-        setSettings({
-          ...settings!,
-          platformLogo: data.logo,
-        });
+        setSettings({ ...settings!, platformLogo: data.logo });
         setMessage("Logo uploaded successfully!");
         setTimeout(() => setMessage(""), 3000);
-        // Dispatch custom event to notify other components (like Navbar)
         window.dispatchEvent(new CustomEvent('platformSettingsUpdated'));
       } else {
         setMessage("Failed to upload logo");

@@ -15,27 +15,23 @@ export default function Home() {
       <Card>
         <h1 className="text-xl font-bold">{t("welcome")}</h1>
         <p className="mt-2 text-gray-700">{t("description")}</p>
-        <div className="mt-4 flex gap-3">
-          <Link
-            className="rounded bg-blue-700 px-4 py-2 text-white hover:bg-blue-800"
-            href={`/${locale}/login`}
-          >
-            {tNav("login")}
-          </Link>
-          <Link
-            className="rounded border px-4 py-2 hover:bg-gray-50"
-            href={`/${locale}/register`}
-          >
-            {tNav("register")}
-          </Link>
-          <Link href={`/${locale}/forgot-password`} className="text-blue-600 hover:underline">
+        <div className="mt-4 flex flex-col gap-3">
+          <div className="flex gap-3">
+            <Link
+              className="rounded bg-blue-700 px-4 py-2 text-white hover:bg-blue-800"
+              href={`/${locale}/login`}
+            >
+              {tNav("login")}
+            </Link>
+            <Link
+              className="rounded border px-4 py-2 hover:bg-gray-50"
+              href={`/${locale}/register`}
+            >
+              {tNav("register")}
+            </Link>
+          </div>
+          <Link href={`/${locale}/forgot-password`} className="text-sm text-blue-600 hover:underline">
             {tAuth("forgotPassword")}
-          </Link>
-          <Link
-            className="rounded border px-4 py-2 hover:bg-gray-50"
-            href={`/${locale}/dashboard`}
-          >
-            {t("goToDashboard")}
           </Link>
         </div>
       </Card>

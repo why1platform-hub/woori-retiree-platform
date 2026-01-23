@@ -4,18 +4,6 @@ import { useEffect, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Card, Button, Input } from "@/components/UI";
 import TimeSelect from "@/components/TimeSelect";
-import dynamic from 'next/dynamic';
-const ChatModal = dynamic(() => import('@/components/ChatModal'), { ssr: false });
-
-const DAYS = [
-  { value: 0, label: "Sun" },
-  { value: 1, label: "Mon" },
-  { value: 2, label: "Tue" },
-  { value: 3, label: "Wed" },
-  { value: 4, label: "Thu" },
-  { value: 5, label: "Fri" },
-  { value: 6, label: "Sat" },
-];
 
 export default function ConsultationPage() {
   const t = useTranslations("consultations");
@@ -27,12 +15,11 @@ export default function ConsultationPage() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
   const [user, setUser] = useState<any | null>(null);
-  const [chatPeer, setChatPeer] = useState<string | null>(null);
   const [userBookings, setUserBookings] = useState<any[]>([]);
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const [instructorRequests, setInstructorRequests] = useState<any[]>([]);
 
-  // For instructors: create slots with days and weeks
+  // For instructors: create slots
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("17:00");
   const [topic, setTopic] = useState("General");
@@ -42,21 +29,41 @@ export default function ConsultationPage() {
 
   useEffect(() => {
     async function init() {
-      setLoading(true);
-      const [insRes, meRes, myBookingsRes] = await Promise.all([fetch('/api/instructors'), fetch('/api/me'), fetch('/api/consultation/bookings')]);
-      if (insRes.ok) { const d = await insRes.json(); setInstructors(d.instructors || []); if ((d.instructors || []).length) setSelectedInstructor(d.instructors[0]._id); }
-      if (meRes.ok) { const d = await meRes.json(); setUser(d.user); }
-      if (myBookingsRes.ok) { const d = await myBookingsRes.json(); setUserBookings(d.bookings || []); }
+      try {
+        const [insRes, meRes, myBookingsRes] = await Promise.all([
+          fetch('/api/instructors'),
+          fetch('/api/me'),
+          fetch('/api/consultation/bookings'),
+        ]);
 
-      // If current user is an instructor, fetch instructor requests
-      if (meRes.ok) {
-        const me = await meRes.json();
-        if (me.user && me.user.role === 'instructor') {
+        if (insRes.ok) {
+          const d = await insRes.json();
+          setInstructors(d.instructors || []);
+          if ((d.instructors || []).length) setSelectedInstructor(d.instructors[0]._id);
+        }
+
+        let currentUser = null;
+        if (meRes.ok) {
+          const d = await meRes.json();
+          currentUser = d.user;
+          setUser(d.user);
+        }
+
+        if (myBookingsRes.ok) {
+          const d = await myBookingsRes.json();
+          setUserBookings(d.bookings || []);
+        }
+
+        // If instructor, fetch booking requests
+        if (currentUser?.role === 'instructor') {
           const r = await fetch('/api/consultation/bookings?instructor=true');
           if (r.ok) { const dd = await r.json(); setInstructorRequests(dd.bookings || []); }
         }
+      } catch (err) {
+        console.error("Failed to load consultation data:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     init();
   }, []);
@@ -64,11 +71,9 @@ export default function ConsultationPage() {
   useEffect(() => {
     if (!selectedInstructor || !date) return;
     async function loadSlots() {
-      setLoading(true);
       const res = await fetch(`/api/consultation/slots?instructorId=${selectedInstructor}`);
-        if (res.ok) {
+      if (res.ok) {
         const d = await res.json();
-        // filter slots for the selected date using local date (avoid timezone mismatch)
         const filtered = (d.slots || []).filter((s: any) => {
           const dt = new Date(s.startsAt);
           const slotDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
@@ -76,26 +81,23 @@ export default function ConsultationPage() {
         });
         setSlots(filtered);
       }
-      setLoading(false);
     }
     loadSlots();
   }, [selectedInstructor, date]);
 
   async function handleBook(slotId: string) {
     setMsg(null);
-    // optimistic UI: mark as pending
     setPending(p => ({ ...p, [slotId]: true }));
     try {
       const res = await fetch('/api/consultation/bookings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slotId }) });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         setPending(p => { const np = { ...p }; delete np[slotId]; return np; });
-        setMsg(data?.message || `Booking failed (${res.status})`);
+        setMsg(data?.message || 'Booking failed');
       } else {
-        setMsg('Booking requested');
-        // add booking to user's bookings
+        setMsg('Booking requested!');
         if (data?.booking) setUserBookings(prev => [data.booking, ...prev]);
-        // refresh slots for the instructor
+        // Refresh slots
         const r = await fetch(`/api/consultation/slots?instructorId=${selectedInstructor}`);
         if (r.ok) {
           const dd = await r.json();
@@ -107,13 +109,12 @@ export default function ConsultationPage() {
           setSlots(filtered);
         }
       }
-    } catch (err) {
+    } catch {
       setPending(p => { const np = { ...p }; delete np[slotId]; return np; });
       setMsg('Booking failed');
     }
   }
 
-  // Instructor: create 30-min slots using the new API format
   async function handleCreateSlots() {
     if (!user || user.role !== 'instructor') return;
     setCreating(true);
@@ -136,8 +137,8 @@ export default function ConsultationPage() {
         setMsg(data.message || 'Failed to create slots');
       } else {
         setMsg(`Created ${data.count} slots`);
-        // refresh slots
-        const r = await fetch(`/api/consultation/slots?mine=true`);
+        // Refresh slots
+        const r = await fetch(`/api/consultation/slots?instructorId=${user._id || selectedInstructor}`);
         if (r.ok) {
           const dd = await r.json();
           const filtered = (dd.slots || []).filter((s: any) => {
@@ -148,265 +149,177 @@ export default function ConsultationPage() {
           setSlots(filtered);
         }
       }
-    } catch (err) { setMsg('Failed to create slots'); }
+    } catch { setMsg('Failed to create slots'); }
     finally { setCreating(false); }
   }
 
-  // Instructor actions: approve / reject booking
   async function handleInstructorAction(bookingId: string, action: 'approve' | 'reject') {
     setMsg(null);
     try {
       const res = await fetch('/api/consultation/bookings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bookingId, action }) });
-      if (!res.ok) { const d = await res.json().catch(() => null); setMsg(d?.message || `Failed (${res.status})`); return; }
-      const updated = await res.json();
-      // refresh instructor requests and slots and userBookings
+      if (!res.ok) { const d = await res.json().catch(() => null); setMsg(d?.message || 'Failed'); return; }
+      // Refresh
       const r = await fetch('/api/consultation/bookings?instructor=true');
       if (r.ok) { const dd = await r.json(); setInstructorRequests(dd.bookings || []); }
-      const s = await fetch(`/api/consultation/slots?instructorId=${selectedInstructor}`);
-      if (s.ok) { const sd = await s.json(); const filtered = (sd.slots || []).filter((slot: any) => {
-        const dt = new Date(slot.startsAt);
-        const slotDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-        return slotDate === date;
-      }); setSlots(filtered); }
-      // refresh user's bookings (so user sees approval)
-      const myb = await fetch('/api/consultation/bookings');
-      if (myb.ok) { const md = await myb.json(); setUserBookings(md.bookings || []); }
-      setMsg(`Booking ${action}ed`);
-    } catch (err) { setMsg('Failed to update booking'); }
+      setMsg(`Booking ${action}d`);
+    } catch { setMsg('Failed to update booking'); }
   }
+
   function toggleDay(day: number) {
-    setSelectedDays(prev =>
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
-    );
+    setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
   }
 
-  // refresh instructor requests when instructor user is viewing
-  useEffect(() => {
-    async function loadRequests() {
-      if (!user || user.role !== 'instructor') return;
-      const res = await fetch('/api/consultation/bookings?instructor=true');
-      if (res.ok) { const d = await res.json(); setInstructorRequests(d.bookings || []); }
-    }
-    loadRequests();
-  }, [user, selectedInstructor, date]);
+  const DAYS = [
+    { value: 0, label: locale === 'ko' ? '일' : 'Sun' },
+    { value: 1, label: locale === 'ko' ? '월' : 'Mon' },
+    { value: 2, label: locale === 'ko' ? '화' : 'Tue' },
+    { value: 3, label: locale === 'ko' ? '수' : 'Wed' },
+    { value: 4, label: locale === 'ko' ? '목' : 'Thu' },
+    { value: 5, label: locale === 'ko' ? '금' : 'Fri' },
+    { value: 6, label: locale === 'ko' ? '토' : 'Sat' },
+  ];
 
-  if (loading) return <div className="text-gray-600">Loading...</div>;
+  if (loading) return <p className="text-gray-500 p-4">{locale === 'ko' ? '로딩 중...' : 'Loading...'}</p>;
 
   return (
-    <div className="grid gap-6">
-      {chatPeer && <ChatModal peerId={chatPeer} onClose={() => setChatPeer(null)} />}
+    <div className="grid gap-4">
       <h1 className="text-2xl font-bold">{t('title')}</h1>
 
-      <Card>
-        <div className="grid gap-3">
-          <label>Instructor</label>
-          <select value={selectedInstructor || ''} onChange={(e) => setSelectedInstructor(e.target.value)} className="rounded border px-3 py-2">
-            {instructors.map((ins) => <option key={ins._id} value={ins._id}>{ins.name}</option>)}
-          </select>
-
-          <label>Date</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded border px-3 py-2" />
-
-          <div>
-            <h3 className="font-medium mb-2">{t('availableTimes')}</h3>
-            <div className="text-xs text-gray-500 mb-2">{t('startDate')}: {date}</div>
-            {slots.length === 0 ? <p className="text-gray-500">{t('noAvailableSlots')}</p> : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="text-left p-2">Time</th>
-                      <th className="text-left p-2">Topic</th>
-                      <th className="text-left p-2">Status</th>
-                      <th className="text-left p-2">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {slots.map((s) => {
-                      const userBooking = userBookings.find(b => String(b.slotId?._id || b.slotId) === String(s._id));
-                      const isUserPending = !!pending[s._id] || (!!userBooking && userBooking.status === 'pending');
-                      const isUserApproved = !!userBooking && userBooking.status === 'approved';
-                      const statusLabel = s.isBooked ? 'Booked' : isUserApproved ? 'Approved' : isUserPending ? 'Requested' : 'Available';
-
-                      return (
-                        <tr key={s._id} className="border-t">
-                          <td className="p-2">{new Date(s.startsAt).toLocaleTimeString(locale, {hour: '2-digit', minute:'2-digit', hour12: false})} - {new Date(s.endsAt).toLocaleTimeString(locale, {hour: '2-digit', minute:'2-digit', hour12: false})}</td>
-                          <td className="p-2">{s.topic}</td>
-                          <td className="p-2">
-                            <span className={`font-medium ${s.isBooked ? 'text-gray-600' : isUserApproved ? 'text-green-700' : isUserPending ? 'text-orange-700' : 'text-gray-700'}`}>{statusLabel}</span>
-                          </td>
-                          <td className="p-2">
-                            {s.isBooked ? (
-                              <button className="rounded bg-gray-400 px-3 py-1 text-white" disabled>Booked</button>
-                            ) : isUserPending ? (
-                              <button className="rounded bg-gray-400 px-3 py-1 text-white" disabled>Requested</button>
-                            ) : isUserApproved ? (
-                              <button className="rounded bg-green-600 px-3 py-1 text-white" disabled>Approved</button>
-                            ) : (
-                              <button className="rounded bg-blue-600 px-3 py-1 text-white" onClick={() => handleBook(s._id)}>Book</button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {msg && <p className="text-sm text-gray-700">{msg}</p>}
-
-          {/* My Bookings (user) */}
-          {user && userBookings && userBookings.filter(b => String(b.instructorId?._id || b.instructorId) === String(selectedInstructor)).length > 0 && (
-            <div className="mt-4">
-              <h4 className="font-medium">My Bookings</h4>
-              <div className="overflow-x-auto mt-2">
-                <table className="w-full text-sm border">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="text-left p-2">Time</th>
-                      <th className="text-left p-2">Topic</th>
-                      <th className="text-left p-2">Status</th>
-                      <th className="text-left p-2">Meeting</th>
-                      <th className="text-left p-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {userBookings.filter(b => String(b.instructorId?._id || b.instructorId) === String(selectedInstructor)).map(b => (
-                      <tr key={b._id} className="border-t">
-                        <td className="p-2">{b.slotId?.startsAt ? new Date(b.slotId.startsAt).toLocaleString() : '—'}</td>
-                        <td className="p-2">{b.slotId?.topic || '—'}</td>
-                        <td className="p-2"><span className={`${b.status === 'approved' ? 'text-green-700' : b.status === 'pending' ? 'text-orange-700' : 'text-gray-700'}`}>{b.status}</span></td>
-                        <td className="p-2">{b.meetingLink ? <a className="text-blue-700" href={b.meetingLink} target="_blank">Link</a> : '—'}</td>
-                        <td className="p-2">
-                          {b.status === 'approved' && (
-                            <div className="flex gap-2">
-                              <button onClick={() => setChatPeer(b.instructorId?._id || b.instructorId)} className="text-sm text-blue-600 hover:underline">DM</button>
-                              <button className="text-sm text-gray-600 hover:underline" onClick={async () => { const res = await fetch('/api/users/follow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: b.instructorId?._id || b.instructorId }) }); if (res.ok) alert('Toggled follow'); }}>Follow</button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-        </div>
-      </Card>
-
-      {/* Instructor area */}
-      {user && user.role === 'instructor' && (
+      {/* Instructor: Create Slots */}
+      {user?.role === 'instructor' && (
         <Card>
-          <h2 className="font-semibold mb-3">Instructor — Create Operating Slots</h2>
-          <div className="grid gap-4">
-            <div className="grid grid-cols-2 gap-4">
+          <h2 className="font-semibold mb-3">{t('createSlots')}</h2>
+          <div className="grid gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium mb-1">{t('startTime')}</label>
+                <label className="block text-sm mb-1">{t('startTime')}</label>
                 <TimeSelect value={startTime} onChange={setStartTime} className="w-full rounded border px-3 py-2" hour12={false} locale={locale} />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">{t('endTime')}</label>
+                <label className="block text-sm mb-1">{t('endTime')}</label>
                 <TimeSelect value={endTime} onChange={setEndTime} className="w-full rounded border px-3 py-2" hour12={false} locale={locale} />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Topic</label>
-              <Input placeholder="e.g. General, Career Advice" value={topic} onChange={(e:any)=>setTopic(e.target.value)} />
+              <label className="block text-sm mb-1">{t('topic')}</label>
+              <Input placeholder={locale === 'ko' ? '예: 취업 상담' : 'e.g. Career Advice'} value={topic} onChange={(e: any) => setTopic(e.target.value)} />
             </div>
-
             <div>
-              <label className="block text-sm font-medium mb-2">Repeat on Days</label>
+              <label className="block text-sm mb-1">{t('startDate')}</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded border px-3 py-2 w-full" />
+            </div>
+            <div>
+              <label className="block text-sm mb-2">{t('repeatDays')}</label>
               <div className="flex flex-wrap gap-2">
                 {DAYS.map((day) => (
                   <button
                     key={day.value}
                     type="button"
                     onClick={() => toggleDay(day.value)}
-                    className={`px-3 py-1 rounded border text-sm ${
-                      selectedDays.includes(day.value)
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white text-gray-700 hover:bg-gray-50"
-                    }`}
+                    className={`px-3 py-1 rounded border text-sm ${selectedDays.includes(day.value) ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 hover:bg-gray-50"}`}
                   >
                     {day.label}
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-gray-500 mt-1">Select days to repeat the time slot. Leave empty for selected date only.</p>
             </div>
-
             <div>
-              <label className="block text-sm font-medium mb-1">Weeks</label>
-              <select
-                value={weeks}
-                onChange={(e) => setWeeks(Number(e.target.value))}
-                className="rounded border px-3 py-2"
-              >
-                <option value={1}>1 week</option>
-                <option value={2}>2 weeks</option>
-                <option value={4}>4 weeks</option>
-                <option value={8}>8 weeks</option>
+              <label className="block text-sm mb-1">{locale === 'ko' ? '반복 주' : 'Weeks'}</label>
+              <select value={weeks} onChange={(e) => setWeeks(Number(e.target.value))} className="rounded border px-3 py-2">
+                <option value={1}>{locale === 'ko' ? '1주' : '1 week'}</option>
+                <option value={2}>{locale === 'ko' ? '2주' : '2 weeks'}</option>
+                <option value={4}>{locale === 'ko' ? '4주' : '4 weeks'}</option>
               </select>
             </div>
-
             <Button disabled={creating} onClick={handleCreateSlots}>
-              {creating ? t('creating') : t('createSlots')}
+              {creating ? (locale === 'ko' ? '생성 중...' : 'Creating...') : t('createSlots')}
             </Button>
-
-            {/* Requests */}
-            <div className="mt-6">
-              <h3 className="font-medium mb-2">Requests</h3>
-              {instructorRequests.filter(r => {
-                if (!r.slotId?.startsAt) return true;
-                const dt = new Date(r.slotId.startsAt);
-                const slotDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-                return !date || slotDate === date;
-              }).length === 0 ? (
-                <p className="text-gray-500">No requests</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm border">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="text-left p-2">User</th>
-                        <th className="text-left p-2">Slot</th>
-                        <th className="text-left p-2">Status</th>
-                        <th className="text-left p-2">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {instructorRequests.filter(r => {
-                        if (!r.slotId?.startsAt) return true;
-                        const dt = new Date(r.slotId.startsAt);
-                        const slotDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-                        return !date || slotDate === date;
-                      }).map((r) => (
-                        <tr key={r._id} className="border-t">
-                          <td className="p-2">{r.userId?.name || r.userId?.email}</td>
-                          <td className="p-2">{r.slotId?.startsAt ? new Date(r.slotId.startsAt).toLocaleString() : '—'}</td>
-                          <td className="p-2">{r.status}</td>
-                          <td className="p-2">
-                            {r.status === 'pending' && (
-                              <div className="flex gap-2">
-                                <button onClick={() => handleInstructorAction(r._id, 'approve')} className="rounded bg-green-600 px-3 py-1 text-white">Approve</button>
-                                <button onClick={() => handleInstructorAction(r._id, 'reject')} className="rounded bg-red-500 px-3 py-1 text-white">Reject</button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
           </div>
+
+          {/* Instructor Booking Requests */}
+          {instructorRequests.length > 0 && (
+            <div className="mt-4 pt-4 border-t">
+              <h3 className="font-medium mb-2">{locale === 'ko' ? '예약 요청' : 'Booking Requests'}</h3>
+              <div className="grid gap-2">
+                {instructorRequests.filter(r => r.status === 'pending').map((r) => (
+                  <div key={r._id} className="flex items-center justify-between border rounded p-2">
+                    <div>
+                      <span className="font-medium text-sm">{r.userId?.name || r.userId?.email}</span>
+                      <span className="text-xs text-gray-500 ml-2">{r.slotId?.startsAt ? new Date(r.slotId.startsAt).toLocaleString(locale) : '—'}</span>
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => handleInstructorAction(r._id, 'approve')} className="rounded bg-green-600 px-2 py-1 text-white text-xs">{locale === 'ko' ? '승인' : 'Approve'}</button>
+                      <button onClick={() => handleInstructorAction(r._id, 'reject')} className="rounded bg-red-500 px-2 py-1 text-white text-xs">{locale === 'ko' ? '거절' : 'Reject'}</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </Card>
       )}
+
+      {/* User: Browse & Book Slots */}
+      <Card>
+        <div className="grid gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm mb-1">{t('selectInstructor')}</label>
+              <select value={selectedInstructor || ''} onChange={(e) => setSelectedInstructor(e.target.value)} className="w-full rounded border px-3 py-2">
+                {instructors.length === 0 && <option value="">{locale === 'ko' ? '강사 없음' : 'No instructors'}</option>}
+                {instructors.map((ins) => <option key={ins._id} value={ins._id}>{ins.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm mb-1">{locale === 'ko' ? '날짜' : 'Date'}</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded border px-3 py-2" />
+            </div>
+          </div>
+
+          <div>
+            <h3 className="font-medium mb-2">{t('availableTimes')}</h3>
+            {instructors.length === 0 ? (
+              <p className="text-gray-500 text-sm">{locale === 'ko' ? '등록된 강사가 없습니다.' : 'No instructors available.'}</p>
+            ) : slots.length === 0 ? (
+              <p className="text-gray-500 text-sm">{t('noAvailableSlots')}</p>
+            ) : (
+              <div className="grid gap-2">
+                {slots.map((s) => {
+                  const userBooking = userBookings.find(b => String(b.slotId?._id || b.slotId) === String(s._id));
+                  const isUserPending = !!pending[s._id] || (!!userBooking && userBooking.status === 'pending');
+                  const isUserApproved = !!userBooking && userBooking.status === 'approved';
+
+                  return (
+                    <div key={s._id} className="flex items-center justify-between border rounded px-3 py-2">
+                      <div>
+                        <span className="text-sm font-medium">
+                          {new Date(s.startsAt).toLocaleTimeString(locale, {hour: '2-digit', minute:'2-digit', hour12: false})} - {new Date(s.endsAt).toLocaleTimeString(locale, {hour: '2-digit', minute:'2-digit', hour12: false})}
+                        </span>
+                        <span className="text-xs text-gray-500 ml-2">{s.topic}</span>
+                      </div>
+                      <div>
+                        {s.isBooked ? (
+                          <span className="text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded">{locale === 'ko' ? '예약됨' : 'Booked'}</span>
+                        ) : isUserApproved ? (
+                          <span className="text-xs text-green-700 px-2 py-1 bg-green-50 rounded">{locale === 'ko' ? '승인됨' : 'Approved'}</span>
+                        ) : isUserPending ? (
+                          <span className="text-xs text-orange-700 px-2 py-1 bg-orange-50 rounded">{locale === 'ko' ? '대기 중' : 'Pending'}</span>
+                        ) : (
+                          <button className="rounded bg-blue-600 px-3 py-1 text-white text-xs" onClick={() => handleBook(s._id)}>
+                            {locale === 'ko' ? '예약' : 'Book'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {msg && <p className="text-sm text-blue-700 bg-blue-50 rounded p-2">{msg}</p>}
+        </div>
+      </Card>
     </div>
   );
 }

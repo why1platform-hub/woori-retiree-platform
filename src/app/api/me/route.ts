@@ -9,8 +9,8 @@ export async function GET() {
   if (!auth) return error("Unauthenticated", 401);
   await dbConnect();
   const user = await User.findById(auth.sub).select("-passwordHash").lean();
-  if (!user) return json({ id: auth.sub, email: auth.email, name: auth.name, role: auth.role });
-  return json({ ...user, id: auth.sub });
+  if (!user) return json({ user: { id: auth.sub, email: auth.email, name: auth.name, role: auth.role } });
+  return json({ user: { ...user, id: auth.sub } });
 }
 
 const PutBody = z.object({ name: z.string().min(1).optional(), phone: z.string().optional(), bio: z.string().optional(), organization: z.string().optional() });

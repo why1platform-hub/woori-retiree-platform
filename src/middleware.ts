@@ -3,7 +3,7 @@ import { getAuthFromRequest } from "@/lib/auth";
 import createMiddleware from 'next-intl/middleware';
 import { routing } from '@/i18n/routing';
 
-const protectedPrefixes = ["/dashboard", "/programs", "/my-activity", "/jobs", "/learning", "/support", "/admin", "/instructor"];
+const protectedPrefixes = ["/dashboard", "/programs", "/my-activity", "/jobs", "/learning", "/support", "/admin", "/instructor", "/profile", "/consultation"];
 
 // Create the next-intl middleware
 const intlMiddleware = createMiddleware(routing);

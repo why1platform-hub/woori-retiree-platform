@@ -258,6 +258,7 @@ export default function LearningPage() {
                       src={embedUrl}
                       className="absolute inset-0 h-full w-full"
                       allowFullScreen
+                      loading="lazy"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     />
                   </div>
@@ -324,6 +325,7 @@ export default function LearningPage() {
                         src={course.thumbnailUrl}
                         alt={course.title}
                         className="mb-3 h-40 w-full rounded object-cover"
+                        loading="lazy"
                       />
                     ) : (
                       <div className="mb-3 flex h-40 w-full items-center justify-center rounded bg-gray-100">

@@ -1,7 +1,8 @@
 export async function getMeClient() {
   const res = await fetch("/api/me", { cache: "no-store" });
   if (!res.ok) throw new Error("not logged in");
-  return res.json();
+  const data = await res.json();
+  return data.user || data;
 }
 
 export async function loginClient(email: string, password: string) {

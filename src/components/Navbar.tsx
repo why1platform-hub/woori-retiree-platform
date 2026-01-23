@@ -61,16 +61,17 @@ export function Navbar() {
   return (
     <header className="border-b bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <Link href={`/${locale}`} className="flex items-center gap-3">
+        <Link href={me ? `/${locale}/dashboard` : `/${locale}`} className="flex items-center gap-3">
           {settings?.platformLogo?.url && (
-            <img 
-              src={settings.platformLogo.url} 
-              alt="Platform Logo" 
+            <img
+              src={settings.platformLogo.url}
+              alt="Logo"
               className="h-10 w-auto"
+              loading="lazy"
             />
           )}
           <span className="font-semibold">
-            {locale === 'ko' ? settings?.platformName.ko : settings?.platformName.en || t('site.title')}
+            {locale === 'ko' ? settings?.platformName?.ko : settings?.platformName?.en || t('site.title')}
           </span>
         </Link>
 
