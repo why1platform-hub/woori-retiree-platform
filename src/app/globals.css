@@ -5,3 +5,19 @@
 :root { color-scheme: light; }
 body { @apply bg-gray-50 text-gray-900; }
 a { @apply text-blue-700 hover:underline; }
+
+/* Toast notification animation */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}

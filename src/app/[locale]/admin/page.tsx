@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { Card, Badge, Button, Input, Textarea } from "@/components/UI";
+import { Card, Badge, Button, Input, Textarea, ToastContainer, showToast } from "@/components/UI";
 import TimeSelect from "@/components/TimeSelect";
 import dynamic from 'next/dynamic';
 import { PlatformSettingsComponent } from "@/components/PlatformSettings";
@@ -392,6 +392,10 @@ export default function AdminPage() {
       const data = await res.json();
       setUsers([...users, data.user]);
       setUserForm({ name: "", email: "", password: "", role: "user" });
+      showToast(t("users.userCreated"), "success");
+    } else {
+      const err = await res.json().catch(() => null);
+      showToast(err?.message || "Failed to create user", "error");
     }
   };
 
@@ -430,7 +434,9 @@ export default function AdminPage() {
     if (res.ok) {
       const data = await res.json();
       setUsers(users.map(u => u._id === userId ? { ...u, passwordResetRequested: false } : u));
-      alert(locale === 'ko' ? `비밀번호가 초기화되었습니다: ${data.newPassword}` : `Password reset to: ${data.newPassword}`);
+      showToast(t("users.passwordResetSuccess", { password: data.newPassword }), "success");
+    } else {
+      showToast(locale === 'ko' ? '비밀번호 재설정에 실패했습니다' : 'Failed to reset password', "error");
     }
   };
 
@@ -636,11 +642,13 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="grid gap-6">
-      <div>
-        <h1 className="text-2xl font-bold">{t("dashboard")}</h1>
-        <p className="text-gray-600">{t("manageDescription")}</p>
-      </div>
+    <>
+      <ToastContainer />
+      <div className="grid gap-6">
+        <div>
+          <h1 className="text-2xl font-bold">{t("dashboard")}</h1>
+          <p className="text-gray-600">{t("manageDescription")}</p>
+        </div>
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-1 border-b">
@@ -1373,6 +1381,7 @@ export default function AdminPage() {
           </Card>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

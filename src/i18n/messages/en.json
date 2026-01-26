@@ -46,7 +46,9 @@
       "edit": "Edit",
       "resetPassword": "Reset Pwd",
       "saveRole": "Save",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "userCreated": "User account has been created successfully!",
+      "passwordResetSuccess": "Password has been reset successfully. New password: {password}"
     },
     "notices": {
       "title": "Create Notice",
@@ -248,7 +250,8 @@
       "description": "Description",
       "duration": "Duration (min)",
       "thumbnailUrl": "Thumbnail URL (optional)",
-      "videoUrl": "Video URL"
+      "videoUrl": "Video URL",
+      "category": "Category"
     },
     "myCourses": {
       "title": "My Courses"
