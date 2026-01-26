@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useEffect, useState, useMemo } from "react";
+import { useTranslations, useLocale } from "next-intl";
 import { Card, Badge, Button, Textarea, Input } from "@/components/UI";
 import ReplyForm from "./ReplyForm";
 
@@ -22,6 +22,7 @@ interface Inquiry {
 
 export default function SupportPage() {
   const t = useTranslations("support");
+  const locale = useLocale();
   const [faqs, setFaqs] = useState<Faq[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,10 +30,25 @@ export default function SupportPage() {
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any | null>(null);
 
+  // Search filter
+  const [search, setSearch] = useState("");
+
   // New inquiry form
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const filteredFaqs = useMemo(() => {
+    if (!search) return faqs;
+    const q = search.toLowerCase();
+    return faqs.filter(f => f.question.toLowerCase().includes(q) || f.answer.toLowerCase().includes(q));
+  }, [faqs, search]);
+
+  const filteredInquiries = useMemo(() => {
+    if (!search) return inquiries;
+    const q = search.toLowerCase();
+    return inquiries.filter(i => i.subject.toLowerCase().includes(q) || i.message.toLowerCase().includes(q));
+  }, [inquiries, search]);
 
   useEffect(() => {
     async function fetchData() {
@@ -136,6 +152,16 @@ export default function SupportPage() {
     <div className="grid gap-6">
       <h1 className="text-2xl font-bold">{t("title")}</h1>
 
+      {/* Search */}
+      <div className="flex flex-wrap gap-3">
+        <Input
+          placeholder={locale === 'ko' ? '검색...' : 'Search...'}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-2 border-b">
         <button
@@ -146,7 +172,7 @@ export default function SupportPage() {
               : "text-gray-600 hover:text-gray-900"
           }`}
         >
-          {t("faq")} ({faqs.length})
+          {t("faq")} ({filteredFaqs.length})
         </button>
         <button
           onClick={() => setActiveTab("inquiries")}
@@ -156,7 +182,7 @@ export default function SupportPage() {
               : "text-gray-600 hover:text-gray-900"
           }`}
         >
-          {t("myInquiries")} ({inquiries.length})
+          {t("myInquiries")} ({filteredInquiries.length})
         </button>
         <button
           onClick={() => setActiveTab("new")}
@@ -173,13 +199,13 @@ export default function SupportPage() {
       {/* FAQ Tab */}
       {activeTab === "faq" && (
         <>
-          {faqs.length === 0 ? (
+          {filteredFaqs.length === 0 ? (
             <Card>
               <p className="text-gray-500">{t("noFaqs")}</p>
             </Card>
           ) : (
             <div className="grid gap-2">
-              {faqs.map((faq) => (
+              {filteredFaqs.map((faq) => (
                 <Card key={faq._id} className="cursor-pointer">
                   <div
                     onClick={() =>
@@ -208,7 +234,7 @@ export default function SupportPage() {
       {/* My Inquiries Tab */}
       {activeTab === "inquiries" && (
         <>
-          {inquiries.length === 0 ? (
+          {filteredInquiries.length === 0 ? (
             <Card>
               <p className="text-gray-500">{t("noInquiries")}</p>
               <button
@@ -220,7 +246,7 @@ export default function SupportPage() {
             </Card>
           ) : (
             <div className="grid gap-4">
-              {inquiries.map((inquiry) => (
+              {filteredInquiries.map((inquiry) => (
                 <Card key={inquiry._id}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">

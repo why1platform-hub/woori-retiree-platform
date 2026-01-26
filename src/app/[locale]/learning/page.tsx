@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
-import { Card, Badge } from "@/components/UI";
+import { useEffect, useState, useMemo } from "react";
+import { useTranslations, useLocale } from "next-intl";
+import { Card, Badge, Input } from "@/components/UI";
 
 interface CategoryItem {
   _id: string;
@@ -41,13 +41,18 @@ interface Resource {
 export default function LearningPage() {
   const t = useTranslations("learning");
   const tAdmin = useTranslations("admin.courses");
+  const locale = useLocale();
   const [courses, setCourses] = useState<Course[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"courses" | "resources">("courses");
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  const [darkMode, setDarkMode] = useState(true); // Default to dark for video viewing
+  const [darkMode, setDarkMode] = useState(true);
+
+  // Filters
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
 
   useEffect(() => {
     async function fetchData() {
@@ -85,6 +90,26 @@ export default function LearningPage() {
     const cat = categories.find(c => c.name === category);
     return cat?.label || category;
   };
+
+  const filteredCourses = useMemo(() => {
+    let list = courses;
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(c => c.title.toLowerCase().includes(q) || c.description?.toLowerCase().includes(q));
+    }
+    if (categoryFilter) list = list.filter(c => c.category === categoryFilter);
+    return list;
+  }, [courses, search, categoryFilter]);
+
+  const filteredResources = useMemo(() => {
+    let list = resources;
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(r => r.title.toLowerCase().includes(q) || r.description?.toLowerCase().includes(q));
+    }
+    if (categoryFilter) list = list.filter(r => r.category === categoryFilter);
+    return list;
+  }, [resources, search, categoryFilter]);
 
   const getCategoryTone = (category: string): "green" | "blue" | "orange" | "gray" => {
     const cat = categories.find(c => c.name === category);
@@ -286,6 +311,20 @@ export default function LearningPage() {
     <div className="grid gap-6">
       <h1 className="text-2xl font-bold">{t("title")}</h1>
 
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <Input
+          placeholder={locale === 'ko' ? '검색...' : 'Search...'}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
+        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="rounded border px-3 py-2">
+          <option value="">{locale === 'ko' ? '전체 카테고리' : 'All Categories'}</option>
+          {categories.map(cat => <option key={cat._id} value={cat.name}>{cat.label}</option>)}
+        </select>
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-2 border-b">
         <button
@@ -296,7 +335,7 @@ export default function LearningPage() {
               : "text-gray-600 hover:text-gray-900"
           }`}
         >
-          Courses ({courses.length})
+          {locale === 'ko' ? '강좌' : 'Courses'} ({filteredCourses.length})
         </button>
         <button
           onClick={() => setActiveTab("resources")}
@@ -306,20 +345,20 @@ export default function LearningPage() {
               : "text-gray-600 hover:text-gray-900"
           }`}
         >
-          Resources ({resources.length})
+          {locale === 'ko' ? '자료' : 'Resources'} ({filteredResources.length})
         </button>
       </div>
 
       {/* Courses Tab */}
       {activeTab === "courses" && (
         <>
-          {courses.length === 0 ? (
+          {filteredCourses.length === 0 ? (
             <Card>
               <p className="text-gray-500">{tAdmin("noCourses")}</p>
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {courses.map((course) => (
+              {filteredCourses.map((course) => (
                 <Card key={course._id} className="cursor-pointer hover:shadow-md transition-shadow">
                   <div onClick={() => setSelectedCourse(course)}>
                     {course.thumbnailUrl ? (
@@ -366,13 +405,13 @@ export default function LearningPage() {
       {/* Resources Tab */}
       {activeTab === "resources" && (
         <>
-          {resources.length === 0 ? (
+          {filteredResources.length === 0 ? (
             <Card>
-              <p className="text-gray-500">No resources available yet.</p>
+              <p className="text-gray-500">{locale === 'ko' ? '자료가 없습니다.' : 'No resources available.'}</p>
             </Card>
           ) : (
             <div className="grid gap-4">
-              {resources.map((resource) => (
+              {filteredResources.map((resource) => (
                 <Card key={resource._id}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Card, Button, Input } from "@/components/UI";
 import TimeSelect from "@/components/TimeSelect";
@@ -10,16 +10,17 @@ export default function ConsultationPage() {
   const locale = useLocale();
   const [instructors, setInstructors] = useState<any[]>([]);
   const [selectedInstructor, setSelectedInstructor] = useState<string | null>(null);
-  const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [slots, setSlots] = useState<any[]>([]);
+  const [allSlots, setAllSlots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
   const [user, setUser] = useState<any | null>(null);
   const [userBookings, setUserBookings] = useState<any[]>([]);
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const [instructorRequests, setInstructorRequests] = useState<any[]>([]);
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
   // For instructors: create slots
+  const [startDate, setStartDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("17:00");
   const [topic, setTopic] = useState("General");
@@ -54,7 +55,6 @@ export default function ConsultationPage() {
           setUserBookings(d.bookings || []);
         }
 
-        // If instructor, fetch booking requests
         if (currentUser?.role === 'instructor') {
           const r = await fetch('/api/consultation/bookings?instructor=true');
           if (r.ok) { const dd = await r.json(); setInstructorRequests(dd.bookings || []); }
@@ -69,21 +69,60 @@ export default function ConsultationPage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedInstructor || !date) return;
+    if (!selectedInstructor) return;
     async function loadSlots() {
       const res = await fetch(`/api/consultation/slots?instructorId=${selectedInstructor}`);
       if (res.ok) {
         const d = await res.json();
-        const filtered = (d.slots || []).filter((s: any) => {
-          const dt = new Date(s.startsAt);
-          const slotDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-          return slotDate === date;
-        });
-        setSlots(filtered);
+        setAllSlots(d.slots || []);
       }
     }
     loadSlots();
-  }, [selectedInstructor, date]);
+  }, [selectedInstructor]);
+
+  // Group slots by date
+  const slotsByDay = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    allSlots.forEach(slot => {
+      const dt = new Date(slot.startsAt);
+      if (dt < today) return; // Skip past dates
+      const dateKey = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+      if (!groups[dateKey]) groups[dateKey] = [];
+      groups[dateKey].push(slot);
+    });
+
+    // Sort each day's slots by time
+    Object.keys(groups).forEach(key => {
+      groups[key].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+    });
+
+    return groups;
+  }, [allSlots]);
+
+  const sortedDays = useMemo(() => Object.keys(slotsByDay).sort(), [slotsByDay]);
+
+  const toggleDay = (dateKey: string) => {
+    setExpandedDays(prev => {
+      const next = new Set(prev);
+      if (next.has(dateKey)) next.delete(dateKey);
+      else next.add(dateKey);
+      return next;
+    });
+  };
+
+  const formatDayHeader = (dateKey: string) => {
+    const date = new Date(dateKey + 'T00:00:00');
+    const dayNames = locale === 'ko'
+      ? ['일', '월', '화', '수', '목', '금', '토']
+      : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayName = dayNames[date.getDay()];
+    return locale === 'ko'
+      ? `${date.getMonth()+1}월 ${date.getDate()}일 (${dayName})`
+      : `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${dayName})`;
+  };
 
   async function handleBook(slotId: string) {
     setMsg(null);
@@ -95,23 +134,15 @@ export default function ConsultationPage() {
         setPending(p => { const np = { ...p }; delete np[slotId]; return np; });
         setMsg(data?.message || 'Booking failed');
       } else {
-        setMsg('Booking requested!');
+        setMsg(locale === 'ko' ? '예약이 요청되었습니다!' : 'Booking requested!');
         if (data?.booking) setUserBookings(prev => [data.booking, ...prev]);
         // Refresh slots
         const r = await fetch(`/api/consultation/slots?instructorId=${selectedInstructor}`);
-        if (r.ok) {
-          const dd = await r.json();
-          const filtered = (dd.slots || []).filter((s: any) => {
-            const dt = new Date(s.startsAt);
-            const slotDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-            return slotDate === date;
-          });
-          setSlots(filtered);
-        }
+        if (r.ok) { const dd = await r.json(); setAllSlots(dd.slots || []); }
       }
     } catch {
       setPending(p => { const np = { ...p }; delete np[slotId]; return np; });
-      setMsg('Booking failed');
+      setMsg(locale === 'ko' ? '예약 실패' : 'Booking failed');
     }
   }
 
@@ -123,33 +154,17 @@ export default function ConsultationPage() {
       const res = await fetch('/api/consultation/slots', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          date,
-          startTime,
-          endTime,
-          topic,
-          days: selectedDays.length > 0 ? selectedDays : undefined,
-          weeks,
-        }),
+        body: JSON.stringify({ date: startDate, startTime, endTime, topic, days: selectedDays.length > 0 ? selectedDays : undefined, weeks }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setMsg(data.message || 'Failed to create slots');
+        setMsg(data.message || (locale === 'ko' ? '슬롯 생성 실패' : 'Failed to create slots'));
       } else {
-        setMsg(`Created ${data.count} slots`);
-        // Refresh slots
+        setMsg(locale === 'ko' ? `${data.count}개 슬롯 생성됨` : `Created ${data.count} slots`);
         const r = await fetch(`/api/consultation/slots?instructorId=${user._id || selectedInstructor}`);
-        if (r.ok) {
-          const dd = await r.json();
-          const filtered = (dd.slots || []).filter((s: any) => {
-            const dt = new Date(s.startsAt);
-            const slotDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-            return slotDate === date;
-          });
-          setSlots(filtered);
-        }
+        if (r.ok) { const dd = await r.json(); setAllSlots(dd.slots || []); }
       }
-    } catch { setMsg('Failed to create slots'); }
+    } catch { setMsg(locale === 'ko' ? '슬롯 생성 실패' : 'Failed to create slots'); }
     finally { setCreating(false); }
   }
 
@@ -158,14 +173,13 @@ export default function ConsultationPage() {
     try {
       const res = await fetch('/api/consultation/bookings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bookingId, action }) });
       if (!res.ok) { const d = await res.json().catch(() => null); setMsg(d?.message || 'Failed'); return; }
-      // Refresh
       const r = await fetch('/api/consultation/bookings?instructor=true');
       if (r.ok) { const dd = await r.json(); setInstructorRequests(dd.bookings || []); }
-      setMsg(`Booking ${action}d`);
-    } catch { setMsg('Failed to update booking'); }
+      setMsg(locale === 'ko' ? `예약 ${action === 'approve' ? '승인됨' : '거절됨'}` : `Booking ${action}d`);
+    } catch { setMsg(locale === 'ko' ? '업데이트 실패' : 'Failed to update booking'); }
   }
 
-  function toggleDay(day: number) {
+  function toggleRepeatDay(day: number) {
     setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
   }
 
@@ -206,18 +220,14 @@ export default function ConsultationPage() {
             </div>
             <div>
               <label className="block text-sm mb-1">{t('startDate')}</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded border px-3 py-2 w-full" />
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded border px-3 py-2 w-full" />
             </div>
             <div>
               <label className="block text-sm mb-2">{t('repeatDays')}</label>
               <div className="flex flex-wrap gap-2">
                 {DAYS.map((day) => (
-                  <button
-                    key={day.value}
-                    type="button"
-                    onClick={() => toggleDay(day.value)}
-                    className={`px-3 py-1 rounded border text-sm ${selectedDays.includes(day.value) ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 hover:bg-gray-50"}`}
-                  >
+                  <button key={day.value} type="button" onClick={() => toggleRepeatDay(day.value)}
+                    className={`px-3 py-1 rounded border text-sm ${selectedDays.includes(day.value) ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 hover:bg-gray-50"}`}>
                     {day.label}
                   </button>
                 ))}
@@ -237,7 +247,7 @@ export default function ConsultationPage() {
           </div>
 
           {/* Instructor Booking Requests */}
-          {instructorRequests.length > 0 && (
+          {instructorRequests.filter(r => r.status === 'pending').length > 0 && (
             <div className="mt-4 pt-4 border-t">
               <h3 className="font-medium mb-2">{locale === 'ko' ? '예약 요청' : 'Booking Requests'}</h3>
               <div className="grid gap-2">
@@ -262,54 +272,79 @@ export default function ConsultationPage() {
       {/* User: Browse & Book Slots */}
       <Card>
         <div className="grid gap-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm mb-1">{t('selectInstructor')}</label>
-              <select value={selectedInstructor || ''} onChange={(e) => setSelectedInstructor(e.target.value)} className="w-full rounded border px-3 py-2">
-                {instructors.length === 0 && <option value="">{locale === 'ko' ? '강사 없음' : 'No instructors'}</option>}
-                {instructors.map((ins) => <option key={ins._id} value={ins._id}>{ins.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm mb-1">{locale === 'ko' ? '날짜' : 'Date'}</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded border px-3 py-2" />
-            </div>
+          <div>
+            <label className="block text-sm mb-1">{t('selectInstructor')}</label>
+            <select value={selectedInstructor || ''} onChange={(e) => setSelectedInstructor(e.target.value)} className="w-full rounded border px-3 py-2">
+              {instructors.length === 0 && <option value="">{locale === 'ko' ? '강사 없음' : 'No instructors'}</option>}
+              {instructors.map((ins) => <option key={ins._id} value={ins._id}>{ins.name}</option>)}
+            </select>
           </div>
 
           <div>
             <h3 className="font-medium mb-2">{t('availableTimes')}</h3>
             {instructors.length === 0 ? (
               <p className="text-gray-500 text-sm">{locale === 'ko' ? '등록된 강사가 없습니다.' : 'No instructors available.'}</p>
-            ) : slots.length === 0 ? (
+            ) : sortedDays.length === 0 ? (
               <p className="text-gray-500 text-sm">{t('noAvailableSlots')}</p>
             ) : (
               <div className="grid gap-2">
-                {slots.map((s) => {
-                  const userBooking = userBookings.find(b => String(b.slotId?._id || b.slotId) === String(s._id));
-                  const isUserPending = !!pending[s._id] || (!!userBooking && userBooking.status === 'pending');
-                  const isUserApproved = !!userBooking && userBooking.status === 'approved';
+                {sortedDays.map((dateKey) => {
+                  const daySlots = slotsByDay[dateKey];
+                  const availableCount = daySlots.filter(s => !s.isBooked).length;
+                  const isExpanded = expandedDays.has(dateKey);
 
                   return (
-                    <div key={s._id} className="flex items-center justify-between border rounded px-3 py-2">
-                      <div>
-                        <span className="text-sm font-medium">
-                          {new Date(s.startsAt).toLocaleTimeString(locale, {hour: '2-digit', minute:'2-digit', hour12: false})} - {new Date(s.endsAt).toLocaleTimeString(locale, {hour: '2-digit', minute:'2-digit', hour12: false})}
+                    <div key={dateKey} className="border rounded overflow-hidden">
+                      {/* Day Header - Clickable */}
+                      <button
+                        onClick={() => toggleDay(dateKey)}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
+                          <span className="font-medium">{formatDayHeader(dateKey)}</span>
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {availableCount > 0
+                            ? (locale === 'ko' ? `${availableCount}개 예약 가능` : `${availableCount} available`)
+                            : (locale === 'ko' ? '예약 불가' : 'Fully booked')}
                         </span>
-                        <span className="text-xs text-gray-500 ml-2">{s.topic}</span>
-                      </div>
-                      <div>
-                        {s.isBooked ? (
-                          <span className="text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded">{locale === 'ko' ? '예약됨' : 'Booked'}</span>
-                        ) : isUserApproved ? (
-                          <span className="text-xs text-green-700 px-2 py-1 bg-green-50 rounded">{locale === 'ko' ? '승인됨' : 'Approved'}</span>
-                        ) : isUserPending ? (
-                          <span className="text-xs text-orange-700 px-2 py-1 bg-orange-50 rounded">{locale === 'ko' ? '대기 중' : 'Pending'}</span>
-                        ) : (
-                          <button className="rounded bg-blue-600 px-3 py-1 text-white text-xs" onClick={() => handleBook(s._id)}>
-                            {locale === 'ko' ? '예약' : 'Book'}
-                          </button>
-                        )}
-                      </div>
+                      </button>
+
+                      {/* Slots - Collapsible */}
+                      {isExpanded && (
+                        <div className="p-3 bg-white grid gap-2">
+                          {daySlots.map((s) => {
+                            const userBooking = userBookings.find(b => String(b.slotId?._id || b.slotId) === String(s._id));
+                            const isUserPending = !!pending[s._id] || (!!userBooking && userBooking.status === 'pending');
+                            const isUserApproved = !!userBooking && userBooking.status === 'approved';
+
+                            return (
+                              <div key={s._id} className="flex items-center justify-between border rounded px-3 py-2 bg-gray-50">
+                                <div>
+                                  <span className="text-sm font-medium">
+                                    {new Date(s.startsAt).toLocaleTimeString(locale, {hour: '2-digit', minute:'2-digit', hour12: false})} - {new Date(s.endsAt).toLocaleTimeString(locale, {hour: '2-digit', minute:'2-digit', hour12: false})}
+                                  </span>
+                                  <span className="text-xs text-gray-500 ml-2">{s.topic}</span>
+                                </div>
+                                <div>
+                                  {s.isBooked ? (
+                                    <span className="text-xs text-gray-500 px-2 py-1 bg-gray-200 rounded">{locale === 'ko' ? '예약됨' : 'Booked'}</span>
+                                  ) : isUserApproved ? (
+                                    <span className="text-xs text-green-700 px-2 py-1 bg-green-100 rounded">{locale === 'ko' ? '승인됨' : 'Approved'}</span>
+                                  ) : isUserPending ? (
+                                    <span className="text-xs text-orange-700 px-2 py-1 bg-orange-100 rounded">{locale === 'ko' ? '대기 중' : 'Pending'}</span>
+                                  ) : (
+                                    <button className="rounded bg-blue-600 px-3 py-1 text-white text-xs hover:bg-blue-700" onClick={() => handleBook(s._id)}>
+                                      {locale === 'ko' ? '예약' : 'Book'}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
