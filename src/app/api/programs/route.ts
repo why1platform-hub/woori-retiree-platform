@@ -1,5 +1,6 @@
 import { dbConnect } from "@/lib/db";
 import Program from "@/models/Program";
+import Category from "@/models/Category";
 import { json, error } from "@/lib/api";
 import { getAuthFromCookies, requireRole } from "@/lib/auth";
 import { z } from "zod";
@@ -12,7 +13,7 @@ export async function GET() {
 
 const Body = z.object({
   name: z.string().min(2),
-  category: z.enum(["finance","realestate","startup","social"]),
+  category: z.string().min(1),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   모집시작: z.string().datetime(),
@@ -30,6 +31,11 @@ export async function POST(req: Request) {
   if (!parsed.success) return error("Invalid input", 400);
 
   await dbConnect();
+
+  // Validate category exists
+  const categoryExists = await Category.findOne({ name: parsed.data.category });
+  if (!categoryExists) return error("Invalid category", 400);
+
   const payload = { ...parsed.data,
     startDate: new Date(parsed.data.startDate),
     endDate: new Date(parsed.data.endDate),
@@ -43,7 +49,7 @@ export async function POST(req: Request) {
 const PatchBody = z.object({
   id: z.string().min(1),
   name: z.string().min(2).optional(),
-  category: z.enum(["finance","realestate","startup","social"]).optional(),
+  category: z.string().min(1).optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
   모집시작: z.string().datetime().optional(),
@@ -61,6 +67,13 @@ export async function PATCH(req: Request) {
   if (!parsed.success) return error("Invalid input", 400);
 
   await dbConnect();
+
+  // Validate category if provided
+  if (parsed.data.category) {
+    const categoryExists = await Category.findOne({ name: parsed.data.category });
+    if (!categoryExists) return error("Invalid category", 400);
+  }
+
   const { id, ...data } = parsed.data;
   const updates: any = { ...data };
   if (data.startDate) updates.startDate = new Date(data.startDate);

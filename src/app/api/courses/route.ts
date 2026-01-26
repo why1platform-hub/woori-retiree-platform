@@ -1,5 +1,6 @@
 import { dbConnect } from "@/lib/db";
 import Course from "@/models/Course";
+import Category from "@/models/Category";
 import { json, error } from "@/lib/api";
 import { getAuthFromCookies, requireRole } from "@/lib/auth";
 import { z } from "zod";
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
 
 const Body = z.object({
   title: z.string().min(2),
-  category: z.enum(["finance","realestate","startup","social"]).default("finance"),
+  category: z.string().default("finance"),
   thumbnailUrl: z.string().optional().default(""),
   videoUrl: z.string().optional().default(""),
   durationMin: z.number().int().min(1).max(600).optional().default(10),
@@ -38,6 +39,11 @@ export async function POST(req: Request) {
   if (!parsed.success) return error("Invalid input", 400);
 
   await dbConnect();
+
+  // Validate category exists
+  const categoryExists = await Category.findOne({ name: parsed.data.category });
+  if (!categoryExists) return error("Invalid category", 400);
+
   const created = await Course.create({ ...parsed.data, instructorId: auth!.sub });
   return json({ course: created }, { status: 201 });
 }
@@ -45,7 +51,7 @@ export async function POST(req: Request) {
 const PatchBody = z.object({
   id: z.string().min(1),
   title: z.string().min(2).optional(),
-  category: z.enum(["finance","realestate","startup","social"]).optional(),
+  category: z.string().optional(),
   thumbnailUrl: z.string().optional(),
   videoUrl: z.string().optional(),
   durationMin: z.number().int().min(1).max(600).optional(),
@@ -60,6 +66,13 @@ export async function PATCH(req: Request) {
   if (!parsed.success) return error("Invalid input", 400);
 
   await dbConnect();
+
+  // Validate category if provided
+  if (parsed.data.category) {
+    const categoryExists = await Category.findOne({ name: parsed.data.category });
+    if (!categoryExists) return error("Invalid category", 400);
+  }
+
   const { id, ...updates } = parsed.data;
 
   const course = await Course.findById(id);

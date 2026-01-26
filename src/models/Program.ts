@@ -2,7 +2,7 @@ import mongoose, { Schema, type InferSchemaType } from "mongoose";
 
 const ProgramSchema = new Schema({
   name: { type: String, required: true },
-  category: { type: String, enum: ["finance","realestate","startup","social"], required: true },
+  category: { type: String, required: true },
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: true },
   모집시작: { type: Date, required: true },

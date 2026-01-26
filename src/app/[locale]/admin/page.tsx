@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Card, Badge, Button, Input, Textarea } from "@/components/UI";
 import TimeSelect from "@/components/TimeSelect";
@@ -104,6 +104,13 @@ interface Instructor {
   email: string;
 }
 
+interface CategoryItem {
+  _id: string;
+  name: string;
+  label: string;
+  order: number;
+}
+
 export default function AdminPage() {
   const t = useTranslations("admin");
   const locale = useLocale();
@@ -121,12 +128,30 @@ export default function AdminPage() {
   const [slots, setSlots] = useState<ConsultationSlot[]>([]);
   const [bookings, setBookings] = useState<ConsultationBooking[]>([]);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+
+  // Search/filter states
+  const [userSearch, setUserSearch] = useState("");
+  const [noticeSearch, setNoticeSearch] = useState("");
+  const [programSearch, setProgramSearch] = useState("");
+  const [programCategoryFilter, setProgramCategoryFilter] = useState("");
+  const [programStatusFilter, setProgramStatusFilter] = useState("");
+  const [jobSearch, setJobSearch] = useState("");
+  const [courseSearch, setCourseSearch] = useState("");
+  const [courseCategoryFilter, setCourseCategoryFilter] = useState("");
+  const [inquirySearch, setInquirySearch] = useState("");
+  const [consultationSearch, setConsultationSearch] = useState("");
+
+  // Category management
+  const [categoryForm, setCategoryForm] = useState({ name: "", label: "" });
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [categoryEditForm, setCategoryEditForm] = useState({ name: "", label: "", order: 0 });
 
   // Form states
   const [userForm, setUserForm] = useState({ name: "", email: "", password: "", role: "user" });
   const [noticeForm, setNoticeForm] = useState({ title: "", body: "", badge: "info" });
   const [programForm, setProgramForm] = useState({
-    name: "", category: "finance", description: "", startDate: "", endDate: "", status: "upcoming"
+    name: "", category: "", description: "", startDate: "", endDate: "", status: "upcoming"
   });
   const [jobForm, setJobForm] = useState({
     company: "", title: "", location: "", employmentType: "Full-time", salary: "", requirements: "", applyUrl: ""
@@ -159,9 +184,30 @@ export default function AdminPage() {
 
   const [loadedTabs, setLoadedTabs] = useState<Set<Tab>>(new Set());
 
+  // Fetch categories on mount
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
   useEffect(() => {
     fetchTabData(activeTab);
   }, [activeTab]);
+
+  async function fetchCategories() {
+    try {
+      const res = await fetch("/api/categories");
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data.categories || []);
+        // Set default category for program form if empty
+        if (!programForm.category && data.categories?.length > 0) {
+          setProgramForm(prev => ({ ...prev, category: data.categories[0].name }));
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching categories:", err);
+    }
+  }
 
   async function fetchTabData(tab: Tab) {
     setLoading(true);
@@ -221,6 +267,118 @@ export default function AdminPage() {
       setLoading(false);
     }
   }
+
+  // Filtered lists
+  const filteredUsers = useMemo(() => {
+    if (!userSearch) return users;
+    const q = userSearch.toLowerCase();
+    return users.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+  }, [users, userSearch]);
+
+  const filteredNotices = useMemo(() => {
+    if (!noticeSearch) return notices;
+    const q = noticeSearch.toLowerCase();
+    return notices.filter(n => n.title.toLowerCase().includes(q));
+  }, [notices, noticeSearch]);
+
+  const filteredPrograms = useMemo(() => {
+    let list = programs;
+    if (programSearch) {
+      const q = programSearch.toLowerCase();
+      list = list.filter(p => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
+    }
+    if (programCategoryFilter) {
+      list = list.filter(p => p.category === programCategoryFilter);
+    }
+    if (programStatusFilter) {
+      list = list.filter(p => p.status === programStatusFilter);
+    }
+    return list;
+  }, [programs, programSearch, programCategoryFilter, programStatusFilter]);
+
+  const filteredJobs = useMemo(() => {
+    if (!jobSearch) return jobs;
+    const q = jobSearch.toLowerCase();
+    return jobs.filter(j => j.title.toLowerCase().includes(q) || j.company.toLowerCase().includes(q));
+  }, [jobs, jobSearch]);
+
+  const filteredCourses = useMemo(() => {
+    let list = courses;
+    if (courseSearch) {
+      const q = courseSearch.toLowerCase();
+      list = list.filter(c => c.title.toLowerCase().includes(q));
+    }
+    if (courseCategoryFilter) {
+      list = list.filter(c => c.category === courseCategoryFilter);
+    }
+    return list;
+  }, [courses, courseSearch, courseCategoryFilter]);
+
+  const filteredInquiries = useMemo(() => {
+    if (!inquirySearch) return inquiries;
+    const q = inquirySearch.toLowerCase();
+    return inquiries.filter(i => i.subject.toLowerCase().includes(q));
+  }, [inquiries, inquirySearch]);
+
+  const filteredBookings = useMemo(() => {
+    if (!consultationSearch) return bookings;
+    const q = consultationSearch.toLowerCase();
+    return bookings.filter(b =>
+      (b.slotId?.topic || "").toLowerCase().includes(q) ||
+      (b.instructorId?.name || "").toLowerCase().includes(q)
+    );
+  }, [bookings, consultationSearch]);
+
+  const getCategoryLabel = (name: string) => {
+    const cat = categories.find(c => c.name === name);
+    return cat?.label || name;
+  };
+
+  // Category handlers
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const res = await fetch("/api/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...categoryForm, order: categories.length }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setCategories([...categories, data.category]);
+      setCategoryForm({ name: "", label: "" });
+    } else {
+      const err = await res.json().catch(() => null);
+      alert(err?.message || "Failed to create category");
+    }
+  };
+
+  const handleUpdateCategory = async (id: string) => {
+    const res = await fetch("/api/categories", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...categoryEditForm }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setCategories(categories.map(c => c._id === id ? data.category : c));
+      setEditingCategory(null);
+      setCategoryEditForm({ name: "", label: "", order: 0 });
+    } else {
+      const err = await res.json().catch(() => null);
+      alert(err?.message || "Failed to update category");
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm(locale === 'ko' ? '이 카테고리를 삭제하시겠습니까?' : 'Delete this category?')) return;
+    const res = await fetch(`/api/categories?id=${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setCategories(categories.filter(c => c._id !== id));
+    } else {
+      const err = await res.json().catch(() => null);
+      alert(err?.message || "Failed to delete category");
+    }
+  };
 
   // User handlers
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -308,7 +466,7 @@ export default function AdminPage() {
     if (res.ok) {
       const data = await res.json();
       setPrograms([...programs, data.program]);
-      setProgramForm({ name: "", category: "finance", description: "", startDate: "", endDate: "", status: "upcoming" });
+      setProgramForm({ name: "", category: categories[0]?.name || "", description: "", startDate: "", endDate: "", status: "upcoming" });
     }
   };
 
@@ -347,7 +505,6 @@ export default function AdminPage() {
   };
 
   const handleUpdateCourse = async (id: string) => {
-    // Build update payload, only include fields with valid values
     const payload: Record<string, unknown> = { id };
     if (courseEditForm.title) payload.title = courseEditForm.title;
     if (courseEditForm.category) payload.category = courseEditForm.category;
@@ -531,9 +688,17 @@ export default function AdminPage() {
           </Card>
 
           <Card>
-            <h3 className="mb-4 font-semibold">{t("users.usersList")}</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">{t("users.usersList")}</h3>
+              <Input
+                placeholder={locale === 'ko' ? '이름/이메일 검색...' : 'Search name/email...'}
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                className="max-w-xs"
+              />
+            </div>
             <div className="grid gap-4">
-              {users.map(user => (
+              {filteredUsers.map(user => (
                 <div key={user._id} className="border rounded-lg p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -649,9 +814,17 @@ export default function AdminPage() {
           </Card>
 
           <Card>
-            <h3 className="mb-4 font-semibold">{t("notices.noticesList")}</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">{t("notices.noticesList")}</h3>
+              <Input
+                placeholder={locale === 'ko' ? '제목 검색...' : 'Search title...'}
+                value={noticeSearch}
+                onChange={e => setNoticeSearch(e.target.value)}
+                className="max-w-xs"
+              />
+            </div>
             <div className="grid gap-3">
-              {notices.map(notice => (
+              {filteredNotices.map(notice => (
                 <div key={notice._id} className="flex items-start justify-between border-b pb-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -671,16 +844,81 @@ export default function AdminPage() {
       {/* Programs Tab */}
       {activeTab === "programs" && (
         <div className="grid gap-6">
+          {/* Category Management */}
+          <Card>
+            <h3 className="mb-4 font-semibold">{locale === 'ko' ? '카테고리 관리' : 'Manage Categories'}</h3>
+            <form onSubmit={handleCreateCategory} className="flex gap-3 mb-4">
+              <Input
+                placeholder={locale === 'ko' ? '이름 (영문소문자)' : 'Name (lowercase)'}
+                value={categoryForm.name}
+                onChange={e => setCategoryForm({...categoryForm, name: e.target.value})}
+                required
+              />
+              <Input
+                placeholder={locale === 'ko' ? '표시 이름' : 'Display Label'}
+                value={categoryForm.label}
+                onChange={e => setCategoryForm({...categoryForm, label: e.target.value})}
+                required
+              />
+              <Button type="submit">{locale === 'ko' ? '추가' : 'Add'}</Button>
+            </form>
+            <div className="grid gap-2">
+              {categories.map(cat => (
+                <div key={cat._id} className="flex items-center justify-between border-b pb-2">
+                  {editingCategory === cat._id ? (
+                    <div className="flex gap-2 flex-1 mr-2">
+                      <Input
+                        value={categoryEditForm.name}
+                        onChange={e => setCategoryEditForm({...categoryEditForm, name: e.target.value})}
+                        className="flex-1"
+                      />
+                      <Input
+                        value={categoryEditForm.label}
+                        onChange={e => setCategoryEditForm({...categoryEditForm, label: e.target.value})}
+                        className="flex-1"
+                      />
+                      <Button onClick={() => handleUpdateCategory(cat._id)}>{locale === 'ko' ? '저장' : 'Save'}</Button>
+                      <button onClick={() => setEditingCategory(null)} className="text-gray-600 hover:underline text-sm">
+                        {locale === 'ko' ? '취소' : 'Cancel'}
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <span className="font-medium">{cat.label}</span>
+                        <span className="text-sm text-gray-500 ml-2">({cat.name})</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingCategory(cat._id);
+                            setCategoryEditForm({ name: cat.name, label: cat.label, order: cat.order });
+                          }}
+                          className="text-blue-600 hover:underline text-sm"
+                        >
+                          {locale === 'ko' ? '수정' : 'Edit'}
+                        </button>
+                        <button onClick={() => handleDeleteCategory(cat._id)} className="text-red-600 hover:underline text-sm">
+                          {locale === 'ko' ? '삭제' : 'Delete'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Create Program */}
           <Card>
             <h3 className="mb-4 font-semibold">{t("programs.title")}</h3>
             <form onSubmit={handleCreateProgram} className="grid gap-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <Input placeholder={t("programs.name")} value={programForm.name} onChange={e => setProgramForm({...programForm, name: e.target.value})} required />
                 <select value={programForm.category} onChange={e => setProgramForm({...programForm, category: e.target.value})} className="rounded border px-3 py-2">
-                  <option value="finance">Finance</option>
-                  <option value="realestate">Real Estate</option>
-                  <option value="startup">Startup</option>
-                  <option value="social">Social</option>
+                  {categories.map(cat => (
+                    <option key={cat._id} value={cat.name}>{cat.label}</option>
+                  ))}
                 </select>
               </div>
               <Textarea placeholder={t("programs.description")} value={programForm.description} onChange={e => setProgramForm({...programForm, description: e.target.value})} rows={2} required />
@@ -706,21 +944,47 @@ export default function AdminPage() {
             </form>
           </Card>
 
+          {/* Programs List with Search/Filter */}
           <Card>
-            <h3 className="mb-4 font-semibold">{t("programs.programsList")}</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">{t("programs.programsList")}</h3>
+            </div>
+            <div className="flex flex-wrap gap-3 mb-4">
+              <Input
+                placeholder={locale === 'ko' ? '이름/설명 검색...' : 'Search name/description...'}
+                value={programSearch}
+                onChange={e => setProgramSearch(e.target.value)}
+                className="max-w-xs"
+              />
+              <select value={programCategoryFilter} onChange={e => setProgramCategoryFilter(e.target.value)} className="rounded border px-3 py-2">
+                <option value="">{locale === 'ko' ? '전체 카테고리' : 'All Categories'}</option>
+                {categories.map(cat => (
+                  <option key={cat._id} value={cat.name}>{cat.label}</option>
+                ))}
+              </select>
+              <select value={programStatusFilter} onChange={e => setProgramStatusFilter(e.target.value)} className="rounded border px-3 py-2">
+                <option value="">{locale === 'ko' ? '전체 상태' : 'All Status'}</option>
+                <option value="upcoming">{t("programs.upcoming")}</option>
+                <option value="open">{t("programs.open")}</option>
+                <option value="closed">{t("programs.closed")}</option>
+              </select>
+            </div>
             <div className="grid gap-3">
-              {programs.map(program => (
+              {filteredPrograms.map(program => (
                 <div key={program._id} className="flex items-center justify-between border-b pb-3">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{program.name}</span>
                       <Badge tone={program.status === "open" ? "green" : program.status === "upcoming" ? "orange" : "gray"}>{program.status}</Badge>
                     </div>
-                    <p className="text-sm text-gray-500">{program.category} | {new Date(program.startDate).toLocaleDateString()} - {new Date(program.endDate).toLocaleDateString()}</p>
+                    <p className="text-sm text-gray-500">{getCategoryLabel(program.category)} | {new Date(program.startDate).toLocaleDateString()} - {new Date(program.endDate).toLocaleDateString()}</p>
                   </div>
                   <button onClick={() => handleDeleteProgram(program._id)} className="text-red-600 hover:underline text-sm">{t("programs.delete")}</button>
                 </div>
               ))}
+              {filteredPrograms.length === 0 && programs.length > 0 && (
+                <p className="text-sm text-gray-500">{locale === 'ko' ? '검색 결과가 없습니다.' : 'No matching programs.'}</p>
+              )}
             </div>
           </Card>
         </div>
@@ -752,9 +1016,17 @@ export default function AdminPage() {
           </Card>
 
           <Card>
-            <h3 className="mb-4 font-semibold">{t("jobs.jobsList")}</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">{t("jobs.jobsList")}</h3>
+              <Input
+                placeholder={locale === 'ko' ? '제목/회사 검색...' : 'Search title/company...'}
+                value={jobSearch}
+                onChange={e => setJobSearch(e.target.value)}
+                className="max-w-xs"
+              />
+            </div>
             <div className="grid gap-3">
-              {jobs.map(job => (
+              {filteredJobs.map(job => (
                 <div key={job._id} className="flex items-center justify-between border-b pb-3">
                   <div>
                     <span className="font-medium">{job.title}</span>
@@ -764,6 +1036,9 @@ export default function AdminPage() {
                   <button onClick={() => handleDeleteJob(job._id)} className="text-red-600 hover:underline text-sm">{t("jobs.delete")}</button>
                 </div>
               ))}
+              {filteredJobs.length === 0 && jobs.length > 0 && (
+                <p className="text-sm text-gray-500">{locale === 'ko' ? '검색 결과가 없습니다.' : 'No matching jobs.'}</p>
+              )}
             </div>
           </Card>
         </div>
@@ -774,17 +1049,31 @@ export default function AdminPage() {
         <Card>
           <h3 className="mb-4 font-semibold">{t("courses.title")}</h3>
           <p className="text-sm text-gray-600 mb-4">{t("courses.createdByInstructors")}</p>
-          {courses.length === 0 ? (
-            <p className="text-gray-500">{t("courses.noCourses")}</p>
+          <div className="flex flex-wrap gap-3 mb-4">
+            <Input
+              placeholder={locale === 'ko' ? '제목 검색...' : 'Search title...'}
+              value={courseSearch}
+              onChange={e => setCourseSearch(e.target.value)}
+              className="max-w-xs"
+            />
+            <select value={courseCategoryFilter} onChange={e => setCourseCategoryFilter(e.target.value)} className="rounded border px-3 py-2">
+              <option value="">{locale === 'ko' ? '전체 카테고리' : 'All Categories'}</option>
+              {categories.map(cat => (
+                <option key={cat._id} value={cat.name}>{cat.label}</option>
+              ))}
+            </select>
+          </div>
+          {filteredCourses.length === 0 ? (
+            <p className="text-gray-500">{courses.length === 0 ? t("courses.noCourses") : (locale === 'ko' ? '검색 결과가 없습니다.' : 'No matching courses.')}</p>
           ) : (
             <div className="grid gap-3">
-              {courses.map(course => (
+              {filteredCourses.map(course => (
                 <div key={course._id} className="border-b pb-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{course.title}</span>
-                        <Badge tone="blue">{course.category}</Badge>
+                        <Badge tone="blue">{getCategoryLabel(course.category)}</Badge>
                       </div>
                       <p className="text-sm text-gray-500">
                         {course.durationMinutes} min | {course.views} views | By {course.instructor?.name || "Unknown"}
@@ -830,10 +1119,9 @@ export default function AdminPage() {
                           <div>
                             <label className="text-sm text-gray-600">Category</label>
                             <select value={courseEditForm.category} onChange={e => setCourseEditForm({...courseEditForm, category: e.target.value})} className="w-full rounded border px-3 py-2">
-                              <option value="finance">Finance</option>
-                              <option value="realestate">Real Estate</option>
-                              <option value="startup">Startup</option>
-                              <option value="social">Social</option>
+                              {categories.map(cat => (
+                                <option key={cat._id} value={cat.name}>{cat.label}</option>
+                              ))}
                             </select>
                           </div>
                         </div>
@@ -905,12 +1193,20 @@ export default function AdminPage() {
       {/* Inquiries Tab */}
       {activeTab === "inquiries" && (
         <Card>
-          <h3 className="mb-4 font-semibold">Support Inquiries</h3>
-          {inquiries.length === 0 ? (
-            <p className="text-gray-500">No inquiries yet.</p>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold">Support Inquiries</h3>
+            <Input
+              placeholder={locale === 'ko' ? '제목 검색...' : 'Search subject...'}
+              value={inquirySearch}
+              onChange={e => setInquirySearch(e.target.value)}
+              className="max-w-xs"
+            />
+          </div>
+          {filteredInquiries.length === 0 ? (
+            <p className="text-gray-500">{inquiries.length === 0 ? 'No inquiries yet.' : (locale === 'ko' ? '검색 결과가 없습니다.' : 'No matching inquiries.')}</p>
           ) : (
             <div className="grid gap-4">
-              {inquiries.map(inquiry => (
+              {filteredInquiries.map(inquiry => (
                 <div key={inquiry._id} className="border-b pb-4">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -1018,12 +1314,20 @@ export default function AdminPage() {
           </Card>
 
           <Card>
-            <h3 className="mb-4 font-semibold">Bookings ({bookings.length})</h3>
-            {bookings.length === 0 ? (
-              <p className="text-gray-500">No bookings yet.</p>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">Bookings ({filteredBookings.length})</h3>
+              <Input
+                placeholder={locale === 'ko' ? '주제/강사 검색...' : 'Search topic/instructor...'}
+                value={consultationSearch}
+                onChange={e => setConsultationSearch(e.target.value)}
+                className="max-w-xs"
+              />
+            </div>
+            {filteredBookings.length === 0 ? (
+              <p className="text-gray-500">{bookings.length === 0 ? 'No bookings yet.' : (locale === 'ko' ? '검색 결과가 없습니다.' : 'No matching bookings.')}</p>
             ) : (
               <div className="grid gap-2">
-                {bookings.map(b => (
+                {filteredBookings.map(b => (
                   <div key={b._id} className="border-b py-2">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">

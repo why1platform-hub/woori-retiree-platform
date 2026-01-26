@@ -4,6 +4,13 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Card, Badge } from "@/components/UI";
 
+interface CategoryItem {
+  _id: string;
+  name: string;
+  label: string;
+  order: number;
+}
+
 interface Course {
   _id: string;
   title: string;
@@ -36,6 +43,7 @@ export default function LearningPage() {
   const tAdmin = useTranslations("admin.courses");
   const [courses, setCourses] = useState<Course[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"courses" | "resources">("courses");
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -44,9 +52,10 @@ export default function LearningPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [coursesRes, resourcesRes] = await Promise.all([
+        const [coursesRes, resourcesRes, categoriesRes] = await Promise.all([
           fetch("/api/courses"),
           fetch("/api/resources"),
+          fetch("/api/categories"),
         ]);
 
         if (coursesRes.ok) {
@@ -58,6 +67,11 @@ export default function LearningPage() {
           const data = await resourcesRes.json();
           setResources(data.resources || []);
         }
+
+        if (categoriesRes.ok) {
+          const data = await categoriesRes.json();
+          setCategories(data.categories || []);
+        }
       } catch (error) {
         console.error("Error fetching learning data:", error);
       } finally {
@@ -68,26 +82,15 @@ export default function LearningPage() {
   }, []);
 
   const getCategoryLabel = (category: string) => {
-    const labels: Record<string, string> = {
-      finance: "Finance",
-      realestate: "Real Estate",
-      startup: "Startup",
-      social: "Social",
-    };
-    return labels[category] || category;
+    const cat = categories.find(c => c.name === category);
+    return cat?.label || category;
   };
 
   const getCategoryTone = (category: string): "green" | "blue" | "orange" | "gray" => {
-    switch (category) {
-      case "finance":
-        return "green";
-      case "realestate":
-        return "blue";
-      case "startup":
-        return "orange";
-      default:
-        return "gray";
-    }
+    const cat = categories.find(c => c.name === category);
+    const tones: ("green" | "blue" | "orange" | "gray")[] = ["green", "blue", "orange", "gray"];
+    const index = cat ? cat.order % tones.length : 3;
+    return tones[index];
   };
 
   const formatDuration = (minutes: number) => {

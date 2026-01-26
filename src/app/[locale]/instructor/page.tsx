@@ -8,6 +8,13 @@ import DateRangePicker from "@/components/DateRangePicker";
 
 type Tab = "courses" | "resources" | "slots" | "bookings";
 
+interface CategoryItem {
+  _id: string;
+  name: string;
+  label: string;
+  order: number;
+}
+
 interface Course {
   _id: string;
   title: string;
@@ -63,6 +70,7 @@ export default function InstructorPage() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [slots, setSlots] = useState<ConsultationSlot[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
 
   // Form states
   const [courseForm, setCourseForm] = useState({
@@ -92,20 +100,38 @@ export default function InstructorPage() {
     fetchData();
   }, []);
 
+  // Set default category when categories are loaded
+  useEffect(() => {
+    if (categories.length > 0) {
+      const defaultCat = categories[0].name;
+      if (!courseForm.category || courseForm.category === "finance") {
+        setCourseForm(prev => ({ ...prev, category: defaultCat }));
+      }
+      if (!resourceForm.category || resourceForm.category === "finance") {
+        setResourceForm(prev => ({ ...prev, category: defaultCat }));
+      }
+    }
+  }, [categories]);
+
   async function fetchData() {
     setLoading(true);
     try {
-      const [coursesRes, resourcesRes, slotsRes, bookingsRes] = await Promise.all([
+      const [coursesRes, resourcesRes, slotsRes, bookingsRes, categoriesRes] = await Promise.all([
         fetch("/api/courses?mine=true"),
         fetch("/api/resources?mine=true"),
         fetch("/api/consultation/slots?mine=true"),
         fetch("/api/consultation/bookings?instructor=true"),
+        fetch("/api/categories"),
       ]);
 
       if (coursesRes.ok) setCourses((await coursesRes.json()).courses || []);
       if (resourcesRes.ok) setResources((await resourcesRes.json()).resources || []);
       if (slotsRes.ok) setSlots((await slotsRes.json()).slots || []);
       if (bookingsRes.ok) setBookings((await bookingsRes.json()).bookings || []);
+      if (categoriesRes.ok) {
+        const catData = await categoriesRes.json();
+        setCategories(catData.categories || []);
+      }
     } catch (error) {
       console.error("Error fetching instructor data:", error);
     } finally {
@@ -333,13 +359,8 @@ export default function InstructorPage() {
   const t = useTranslations("instructor");
 
   const getCategoryLabel = (category: string) => {
-    const labels: Record<string, string> = {
-      finance: t('categories.finance'),
-      realestate: t('categories.realestate'),
-      startup: t('categories.startup'),
-      social: t('categories.social'),
-    };
-    return labels[category] || category;
+    const cat = categories.find(c => c.name === category);
+    return cat?.label || category;
   };
 
   const formatSlotTime = (startsAt: string, endsAt: string) => {
@@ -400,10 +421,9 @@ export default function InstructorPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <Input placeholder={t('placeholders.courseTitle')} value={courseForm.title} onChange={e => setCourseForm({...courseForm, title: e.target.value})} required />
                 <select value={courseForm.category} onChange={e => setCourseForm({...courseForm, category: e.target.value})} className="rounded border px-3 py-2">
-                  <option value="finance">{t('categories.finance')}</option>
-                  <option value="realestate">{t('categories.realestate')}</option>
-                  <option value="startup">{t('categories.startup')}</option>
-                  <option value="social">{t('categories.social')}</option>
+                  {categories.map(cat => (
+                    <option key={cat._id} value={cat.name}>{cat.label}</option>
+                  ))}
                 </select>
               </div>
               <Textarea placeholder={t('placeholders.description')} value={courseForm.description} onChange={e => setCourseForm({...courseForm, description: e.target.value})} rows={2} required />
@@ -470,12 +490,11 @@ export default function InstructorPage() {
                               <Input value={courseEditForm.title} onChange={e => setCourseEditForm({...courseEditForm, title: e.target.value})} />
                             </div>
                             <div>
-                              <label className="text-sm text-gray-600">{t('categories.finance')}</label>
+                              <label className="text-sm text-gray-600">{t('placeholders.category')}</label>
                               <select value={courseEditForm.category} onChange={e => setCourseEditForm({...courseEditForm, category: e.target.value})} className="w-full rounded border px-3 py-2">
-                                <option value="finance">{t('categories.finance')}</option>
-                                <option value="realestate">{t('categories.realestate')}</option>
-                                <option value="startup">{t('categories.startup')}</option>
-                                <option value="social">{t('categories.social')}</option>
+                                {categories.map(cat => (
+                                  <option key={cat._id} value={cat.name}>{cat.label}</option>
+                                ))}
                               </select>
                             </div>
                           </div>
@@ -523,10 +542,9 @@ export default function InstructorPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <Input placeholder={t('resources.resourceTitle')} value={resourceForm.title} onChange={e => setResourceForm({...resourceForm, title: e.target.value})} required />
                 <select value={resourceForm.category} onChange={e => setResourceForm({...resourceForm, category: e.target.value})} className="rounded border px-3 py-2">
-                  <option value="finance">{t('categories.finance')}</option>
-                  <option value="realestate">{t('categories.realestate')}</option>
-                  <option value="startup">{t('categories.startup')}</option>
-                  <option value="social">{t('categories.social')}</option>
+                  {categories.map(cat => (
+                    <option key={cat._id} value={cat.name}>{cat.label}</option>
+                  ))}
                 </select>
               </div>
               <Textarea placeholder={t('resources.description')} value={resourceForm.description} onChange={e => setResourceForm({...resourceForm, description: e.target.value})} rows={2} required />

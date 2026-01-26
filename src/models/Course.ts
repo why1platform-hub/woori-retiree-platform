@@ -3,7 +3,7 @@ import mongoose, { Schema, type InferSchemaType } from "mongoose";
 const CourseSchema = new Schema({
   instructorId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
   title: { type: String, required: true },
-  category: { type: String, enum: ["finance","realestate","startup","social"], default: "finance" },
+  category: { type: String, default: "finance" },
   thumbnailUrl: { type: String, default: "" },
   videoUrl: { type: String, default: "" }, // MVP: URL to streaming video
   durationMin: { type: Number, default: 10 },

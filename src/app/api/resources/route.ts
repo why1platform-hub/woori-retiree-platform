@@ -1,5 +1,6 @@
 import { dbConnect } from "@/lib/db";
 import Resource from "@/models/Resource";
+import Category from "@/models/Category";
 import { json, error } from "@/lib/api";
 import { getAuthFromCookies, requireRole } from "@/lib/auth";
 import { z } from "zod";
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
 
 const Body = z.object({
   title: z.string().min(2),
-  category: z.enum(["finance","realestate","startup","social"]).default("finance"),
+  category: z.string().default("finance"),
   fileUrl: z.string().url(),
   fileSize: z.string().optional().default(""),
 });
@@ -37,6 +38,11 @@ export async function POST(req: Request) {
   if (!parsed.success) return error("Invalid input", 400);
 
   await dbConnect();
+
+  // Validate category exists
+  const categoryExists = await Category.findOne({ name: parsed.data.category });
+  if (!categoryExists) return error("Invalid category", 400);
+
   const created = await Resource.create({ ...parsed.data, instructorId: auth!.sub });
   return json({ resource: created }, { status: 201 });
 }
