@@ -196,8 +196,10 @@
     "currentPassword": "Current Password",
     "newPassword": "New Password",
     "changePassword": "Change Password",
-    "passwordChanged": "Password changed successfully",
+    "passwordChanged": "Password changed successfully!",
     "passwordChangeFailed": "Unable to change password",
+    "fillAllFields": "Please fill all password fields",
+    "passwordsDoNotMatch": "New passwords do not match",
     "backToLogin": "Back to Login"
   },
   "common": {

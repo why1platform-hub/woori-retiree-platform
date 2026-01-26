@@ -196,8 +196,10 @@
     "currentPassword": "현재 비밀번호",
     "newPassword": "새 비밀번호",
     "changePassword": "비밀번호 변경",
-    "passwordChanged": "비밀번호가 성공적으로 변경되었습니다",
+    "passwordChanged": "비밀번호가 성공적으로 변경되었습니다!",
     "passwordChangeFailed": "비밀번호를 변경할 수 없습니다",
+    "fillAllFields": "모든 비밀번호 필드를 입력해주세요",
+    "passwordsDoNotMatch": "새 비밀번호가 일치하지 않습니다",
     "backToLogin": "로그인으로 돌아가기"
   },
   "common": {

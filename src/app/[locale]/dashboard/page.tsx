@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Card, Badge } from "@/components/UI";
+import { Card, Badge, ToastContainer, showToast } from "@/components/UI";
 
 interface Notice {
   _id: string;
@@ -30,7 +30,6 @@ export default function DashboardPage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPasswordField, setNewPasswordField] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [changeMsg, setChangeMsg] = useState<string | null>(null);
   const [changing, setChanging] = useState(false);
 
   useEffect(() => {
@@ -69,9 +68,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="grid gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t("title")}</h1>
+    <>
+      <ToastContainer />
+      <div className="grid gap-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">{t("title")}</h1>
         {user && (
           <span className="text-sm text-gray-600">
             {user.name} ({user.role})
@@ -153,13 +154,12 @@ export default function DashboardPage() {
           <h2 className="mb-3 font-semibold">{tAuth('changePassword')}</h2>
           <form className="grid gap-3" onSubmit={async (e) => {
             e.preventDefault();
-            setChangeMsg(null);
             if (!currentPassword || !newPasswordField) {
-              setChangeMsg('Please fill all fields');
+              showToast(tAuth('fillAllFields'), 'error');
               return;
             }
             if (newPasswordField !== confirmPassword) {
-              setChangeMsg('New passwords do not match');
+              showToast(tAuth('passwordsDoNotMatch'), 'error');
               return;
             }
             setChanging(true);
@@ -170,13 +170,14 @@ export default function DashboardPage() {
                 body: JSON.stringify({ currentPassword, newPassword: newPasswordField }),
               });
               const data = await res.json();
-              if (!res.ok) setChangeMsg(data.message || tAuth('passwordChangeFailed'));
-              else {
-                setChangeMsg(tAuth('passwordChanged'));
+              if (!res.ok) {
+                showToast(data.message || tAuth('passwordChangeFailed'), 'error');
+              } else {
+                showToast(tAuth('passwordChanged'), 'success');
                 setCurrentPassword(''); setNewPasswordField(''); setConfirmPassword('');
               }
             } catch (err) {
-              setChangeMsg(tAuth('passwordChangeFailed'));
+              showToast(tAuth('passwordChangeFailed'), 'error');
             } finally { setChanging(false); }
           }}>
             <input type="password" placeholder={tAuth('currentPassword')} className="rounded border px-3 py-2" value={currentPassword} onChange={(e)=>setCurrentPassword(e.target.value)} required />
@@ -185,10 +186,10 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3">
               <button disabled={changing} className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 disabled:opacity-50">{changing ? '...' : tAuth('changePassword')}</button>
             </div>
-            {changeMsg && <p className="mt-2 text-sm text-gray-700">{changeMsg}</p>}
           </form>
         </Card>
       )}
-    </div>
+      </div>
+    </>
   );
 }
