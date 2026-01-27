@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Card, Badge, Button, Input, Textarea, ToastContainer, showToast } from "@/components/UI";
 import TimeSelect from "@/components/TimeSelect";
+import RichTextEditor from "@/components/RichTextEditor";
 import dynamic from 'next/dynamic';
 import { PlatformSettingsComponent } from "@/components/PlatformSettings";
 const ChatModal = dynamic(() => import('@/components/ChatModal'), { ssr: false });
@@ -929,7 +930,16 @@ export default function AdminPage() {
                   ))}
                 </select>
               </div>
-              <Textarea placeholder={t("programs.description")} value={programForm.description} onChange={e => setProgramForm({...programForm, description: e.target.value})} rows={2} required />
+              <div>
+                <label className="text-sm text-gray-600 mb-1 block">{t("programs.description")}</label>
+                <RichTextEditor
+                  value={programForm.description}
+                  onChange={(val) => setProgramForm({...programForm, description: val})}
+                  placeholder={t("programs.description")}
+                  rows={4}
+                  locale={locale}
+                />
+              </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
                   <label className="text-sm text-gray-600">{t("programs.startDate")}</label>
