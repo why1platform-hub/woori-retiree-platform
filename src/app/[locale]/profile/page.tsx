@@ -58,9 +58,21 @@ export default function ProfilePage() {
         <div className="grid gap-2">
           <Input type="password" placeholder={t('auth.currentPassword')} value={(form as any)._current || ''} onChange={(e:any) => setForm({...form, _current: e.target.value})} />
           <Input type="password" placeholder={t('auth.newPassword')} value={(form as any)._new || ''} onChange={(e:any) => setForm({...form, _new: e.target.value})} />
+          <Input type="password" placeholder={t('auth.confirmPassword')} value={(form as any)._confirm || ''} onChange={(e:any) => setForm({...form, _confirm: e.target.value})} />
           <Button onClick={async () => {
+            if (!(form as any)._current || !(form as any)._new || !(form as any)._confirm) {
+              setMsg(t('auth.fillAllFields'));
+              return;
+            }
+            if ((form as any)._new !== (form as any)._confirm) {
+              setMsg(t('auth.passwordsDoNotMatch'));
+              return;
+            }
             const res = await fetch('/api/auth/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword: (form as any)._current, newPassword: (form as any)._new }) });
-            if (res.ok) setMsg(t('auth.passwordChanged')); else { const d = await res.json().catch(() => null); setMsg(d?.message || t('common.failed')); }
+            if (res.ok) {
+              setMsg(t('auth.passwordChanged'));
+              setForm({...form, _current: '', _new: '', _confirm: ''});
+            } else { const d = await res.json().catch(() => null); setMsg(d?.message || t('common.failed')); }
           }}>{t('profile.changePasswordButton')}</Button>
         </div>
         {msg && <p className="text-sm text-gray-700">{msg}</p>}
