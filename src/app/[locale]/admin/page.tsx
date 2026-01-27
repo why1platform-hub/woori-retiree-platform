@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Card, Badge, Button, Input, Textarea, ToastContainer, showToast } from "@/components/UI";
 import TimeSelect from "@/components/TimeSelect";
 import RichTextEditor from "@/components/RichTextEditor";
+import ImageUploader from "@/components/ImageUploader";
 import dynamic from 'next/dynamic';
 import { PlatformSettingsComponent } from "@/components/PlatformSettings";
 const ChatModal = dynamic(() => import('@/components/ChatModal'), { ssr: false });
@@ -1337,19 +1338,25 @@ export default function AdminPage() {
                           <label className="text-sm text-gray-600">Description</label>
                           <Textarea value={courseEditForm.description} onChange={e => setCourseEditForm({...courseEditForm, description: e.target.value})} rows={2} />
                         </div>
-                        <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
                           <div>
-                            <label className="text-sm text-gray-600">Duration (minutes)</label>
+                            <label className="text-sm text-gray-600">{locale === 'ko' ? '길이 (분)' : 'Duration (minutes)'}</label>
                             <Input type="number" value={courseEditForm.durationMinutes} onChange={e => setCourseEditForm({...courseEditForm, durationMinutes: parseInt(e.target.value) || 0})} />
                           </div>
                           <div>
-                            <label className="text-sm text-gray-600">Thumbnail URL</label>
-                            <Input value={courseEditForm.thumbnailUrl} onChange={e => setCourseEditForm({...courseEditForm, thumbnailUrl: e.target.value})} />
-                          </div>
-                          <div>
-                            <label className="text-sm text-gray-600">Video URL</label>
+                            <label className="text-sm text-gray-600">{locale === 'ko' ? '비디오 URL' : 'Video URL'}</label>
                             <Input value={courseEditForm.videoUrl} onChange={e => setCourseEditForm({...courseEditForm, videoUrl: e.target.value})} />
                           </div>
+                        </div>
+                        <div>
+                          <label className="text-sm text-gray-600 mb-1 block">{locale === 'ko' ? '썸네일 이미지' : 'Thumbnail Image'}</label>
+                          <ImageUploader
+                            value={courseEditForm.thumbnailUrl}
+                            onChange={(val) => setCourseEditForm({...courseEditForm, thumbnailUrl: val})}
+                            locale={locale}
+                            maxWidth={400}
+                            maxHeight={300}
+                          />
                         </div>
                         <div className="flex gap-2">
                           <Button onClick={() => handleUpdateCourse(course._id)}>{t("courses.save")}</Button>
