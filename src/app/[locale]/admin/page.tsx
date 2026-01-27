@@ -152,8 +152,9 @@ export default function AdminPage() {
   const [userForm, setUserForm] = useState({ name: "", email: "", password: "", role: "user" });
   const [noticeForm, setNoticeForm] = useState({ title: "", body: "", badge: "info" });
   const [programForm, setProgramForm] = useState({
-    name: "", category: "", description: "", startDate: "", endDate: "", status: "upcoming"
+    name: "", category: "", description: "", imageUrl: "", startDate: "", endDate: "", status: "upcoming"
   });
+  const [programImagePreview, setProgramImagePreview] = useState<string | null>(null);
   const [jobForm, setJobForm] = useState({
     company: "", title: "", location: "", employmentType: "Full-time", salary: "", requirements: "", applyUrl: ""
   });
@@ -473,8 +474,26 @@ export default function AdminPage() {
     if (res.ok) {
       const data = await res.json();
       setPrograms([...programs, data.program]);
-      setProgramForm({ name: "", category: categories[0]?.name || "", description: "", startDate: "", endDate: "", status: "upcoming" });
+      setProgramForm({ name: "", category: categories[0]?.name || "", description: "", imageUrl: "", startDate: "", endDate: "", status: "upcoming" });
+      setProgramImagePreview(null);
     }
+  };
+
+  const handleProgramImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert(locale === 'ko' ? '이미지 크기는 5MB 이하여야 합니다' : 'Image size must be less than 5MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result as string;
+      setProgramForm({...programForm, imageUrl: base64});
+      setProgramImagePreview(base64);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDeleteProgram = async (id: string) => {
@@ -939,6 +958,34 @@ export default function AdminPage() {
                   rows={4}
                   locale={locale}
                 />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 mb-1 block">{locale === 'ko' ? '대표 이미지' : 'Cover Image'}</label>
+                <div className="flex items-start gap-4">
+                  {programImagePreview ? (
+                    <div className="relative">
+                      <img src={programImagePreview} alt="Preview" className="w-32 h-24 object-cover rounded border" />
+                      <button
+                        type="button"
+                        onClick={() => { setProgramImagePreview(null); setProgramForm({...programForm, imageUrl: ''}); }}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs"
+                      >×</button>
+                    </div>
+                  ) : (
+                    <div className="w-32 h-24 border-2 border-dashed rounded flex items-center justify-center text-gray-400 text-sm">
+                      {locale === 'ko' ? '이미지 없음' : 'No image'}
+                    </div>
+                  )}
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleProgramImageSelect}
+                      className="text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">{locale === 'ko' ? 'PNG, JPG (최대 5MB)' : 'PNG, JPG (max 5MB)'}</p>
+                  </div>
+                </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>

@@ -8,6 +8,7 @@ const ProgramSchema = new Schema({
   모집시작: { type: Date, required: true },
   모집종료: { type: Date, required: true },
   description: { type: String, default: "" },
+  imageUrl: { type: String, default: "" },
   status: { type: String, enum: ["upcoming","open","closed"], default: "upcoming" },
 }, { timestamps: true });
 

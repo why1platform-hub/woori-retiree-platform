@@ -17,6 +17,7 @@ const Body = z.object({
   startDate: z.string().min(1),
   endDate: z.string().min(1),
   description: z.string().optional().default(""),
+  imageUrl: z.string().optional().default(""),
   status: z.enum(["upcoming","open","closed"]).optional().default("upcoming"),
 });
 
@@ -56,6 +57,7 @@ const PatchBody = z.object({
   startDate: z.string().min(1).optional(),
   endDate: z.string().min(1).optional(),
   description: z.string().optional(),
+  imageUrl: z.string().optional(),
   status: z.enum(["upcoming","open","closed"]).optional(),
 });
 

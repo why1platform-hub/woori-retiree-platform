@@ -9,6 +9,7 @@ interface Program {
   name: string;
   category: string;
   description: string;
+  imageUrl?: string;
   startDate: string;
   endDate: string;
   status: "upcoming" | "open" | "closed";
@@ -146,40 +147,62 @@ export default function ProgramsPage() {
           <p className="text-gray-500">{locale === 'ko' ? '프로그램이 없습니다.' : 'No programs available.'}</p>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredPrograms.map((program) => (
-            <Card key={program._id}>
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-lg">{program.name}</h3>
-                    <Badge tone={getStatusTone(program.status)}>{tAdmin(program.status)}</Badge>
+            <div key={program._id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+              {/* Cover Image */}
+              <div className="relative h-40 bg-gradient-to-br from-blue-100 to-blue-200">
+                {program.imageUrl ? (
+                  <img
+                    src={program.imageUrl}
+                    alt={program.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-blue-400">
+                    <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
                   </div>
-                  <p className="mt-1 text-sm text-gray-500">{getCategoryLabel(program.category)}</p>
-                  <p className="mt-2 text-sm text-gray-700">{program.description}</p>
-                  <div className="mt-3 text-xs text-gray-500">
-                    <p>{tAdmin("startDate")}: {new Date(program.startDate).toLocaleDateString()}</p>
-                    <p>{tAdmin("endDate")}: {new Date(program.endDate).toLocaleDateString()}</p>
-                  </div>
+                )}
+                {/* Status Badge */}
+                <div className="absolute top-3 right-3">
+                  <Badge tone={getStatusTone(program.status)}>{tAdmin(program.status)}</Badge>
+                </div>
+                {/* Category */}
+                <div className="absolute bottom-3 left-3">
+                  <span className="bg-white/90 backdrop-blur px-2 py-1 rounded text-xs font-medium text-gray-700">
+                    {getCategoryLabel(program.category)}
+                  </span>
                 </div>
               </div>
-              <div className="mt-4 border-t pt-3">
-                {hasApplied(program._id) ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">{locale === 'ko' ? '신청됨:' : 'Applied:'}</span>
-                    <Badge tone={getApplicationStatus(program._id) === "approved" ? "green" : getApplicationStatus(program._id) === "rejected" ? "gray" : "orange"}>
-                      {getApplicationStatus(program._id)}
-                    </Badge>
-                  </div>
-                ) : program.status === "open" ? (
-                  <Button onClick={() => handleApply(program._id)} disabled={applying === program._id}>
-                    {applying === program._id ? "..." : t("apply")}
-                  </Button>
-                ) : (
-                  <span className="text-sm text-gray-500">{t("unavailable")}</span>
-                )}
+
+              {/* Content */}
+              <div className="p-4">
+                <h3 className="font-bold text-lg text-gray-900 line-clamp-1">{program.name}</h3>
+                <p className="mt-2 text-sm text-gray-500">
+                  {new Date(program.startDate).toLocaleDateString(locale)} ~ {new Date(program.endDate).toLocaleDateString(locale)}
+                </p>
+
+                {/* Action */}
+                <div className="mt-4">
+                  {hasApplied(program._id) ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">{locale === 'ko' ? '신청됨' : 'Applied'}</span>
+                      <Badge tone={getApplicationStatus(program._id) === "approved" ? "green" : getApplicationStatus(program._id) === "rejected" ? "gray" : "orange"}>
+                        {getApplicationStatus(program._id)}
+                      </Badge>
+                    </div>
+                  ) : program.status === "open" ? (
+                    <Button onClick={() => handleApply(program._id)} disabled={applying === program._id} className="w-full">
+                      {applying === program._id ? "..." : t("apply")}
+                    </Button>
+                  ) : (
+                    <span className="text-sm text-gray-400">{t("unavailable")}</span>
+                  )}
+                </div>
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       )}
