@@ -17,6 +17,8 @@ const Body = z.object({
   employmentType: z.string().optional().default("Full-time"),
   salary: z.string().optional().default(""),
   requirements: z.string().optional().default(""),
+  description: z.string().optional().default(""),
+  companyLogo: z.string().optional().default(""),
   applyUrl: z.string().url().optional().or(z.literal("")).default(""),
 });
 
@@ -41,6 +43,8 @@ const PatchBody = z.object({
   employmentType: z.string().optional(),
   salary: z.string().optional(),
   requirements: z.string().optional(),
+  description: z.string().optional(),
+  companyLogo: z.string().optional(),
   applyUrl: z.string().optional(),
 });
 

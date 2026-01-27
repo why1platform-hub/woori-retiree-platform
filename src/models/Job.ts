@@ -7,6 +7,8 @@ const JobSchema = new Schema({
   employmentType: { type: String, default: "Full-time" },
   salary: { type: String, default: "" },
   requirements: { type: String, default: "" },
+  description: { type: String, default: "" },
+  companyLogo: { type: String, default: "" },
   applyUrl: { type: String, default: "" },
 }, { timestamps: true });
 

@@ -157,7 +157,7 @@ export default function AdminPage() {
   });
   const [programImagePreview, setProgramImagePreview] = useState<string | null>(null);
   const [jobForm, setJobForm] = useState({
-    company: "", title: "", location: "", employmentType: "Full-time", salary: "", requirements: "", applyUrl: ""
+    company: "", title: "", location: "", employmentType: "Full-time", salary: "", requirements: "", description: "", companyLogo: "", applyUrl: ""
   });
   const [faqForm, setFaqForm] = useState({ question: "", answer: "" });
 
@@ -551,7 +551,7 @@ export default function AdminPage() {
     if (res.ok) {
       const data = await res.json();
       setJobs([...jobs, data.job]);
-      setJobForm({ company: "", title: "", location: "", employmentType: "Full-time", salary: "", requirements: "", applyUrl: "" });
+      setJobForm({ company: "", title: "", location: "", employmentType: "Full-time", salary: "", requirements: "", description: "", companyLogo: "", applyUrl: "" });
     }
   };
 
@@ -1212,13 +1212,33 @@ export default function AdminPage() {
               <div className="grid gap-3 sm:grid-cols-3">
                 <Input placeholder={t("jobs.location")} value={jobForm.location} onChange={e => setJobForm({...jobForm, location: e.target.value})} required />
                 <select value={jobForm.employmentType} onChange={e => setJobForm({...jobForm, employmentType: e.target.value})} className="rounded border px-3 py-2">
-                  <option value="Full-time">Full-time</option>
-                  <option value="Part-time">Part-time</option>
-                  <option value="Contract">Contract</option>
+                  <option value="Full-time">{locale === 'ko' ? '정규직' : 'Full-time'}</option>
+                  <option value="Part-time">{locale === 'ko' ? '파트타임' : 'Part-time'}</option>
+                  <option value="Contract">{locale === 'ko' ? '계약직' : 'Contract'}</option>
                 </select>
                 <Input placeholder={t("jobs.salary")} value={jobForm.salary} onChange={e => setJobForm({...jobForm, salary: e.target.value})} required />
               </div>
               <Textarea placeholder={t("jobs.requirements")} value={jobForm.requirements} onChange={e => setJobForm({...jobForm, requirements: e.target.value})} rows={2} required />
+              <div>
+                <label className="text-sm text-gray-600 mb-1 block">{locale === 'ko' ? '상세 설명' : 'Description'}</label>
+                <RichTextEditor
+                  value={jobForm.description}
+                  onChange={(val) => setJobForm({...jobForm, description: val})}
+                  placeholder={locale === 'ko' ? '채용 상세 설명...' : 'Job description...'}
+                  rows={4}
+                  locale={locale}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 mb-1 block">{locale === 'ko' ? '회사 로고' : 'Company Logo'}</label>
+                <ImageUploader
+                  value={jobForm.companyLogo}
+                  onChange={(val) => setJobForm({...jobForm, companyLogo: val})}
+                  locale={locale}
+                  maxWidth={200}
+                  maxHeight={200}
+                />
+              </div>
               <Input placeholder={t("jobs.applyUrl")} value={jobForm.applyUrl} onChange={e => setJobForm({...jobForm, applyUrl: e.target.value})} />
               <Button type="submit">{t("jobs.create")}</Button>
             </form>
