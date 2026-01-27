@@ -333,7 +333,7 @@
   "consultations": {
     "title": "Consultation",
     "availableTimes": "Available times",
-    "noAvailableSlots": "No available slots for selected date.",
+    "noAvailableSlots": "The selected instructor has no available slots at this time.",
     "startTime": "Start Time",
     "endTime": "End Time",
     "topic": "Topic",

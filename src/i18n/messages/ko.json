@@ -333,7 +333,7 @@
   "consultations": {
     "title": "상담",
     "availableTimes": "가능한 시간",
-    "noAvailableSlots": "선택한 날짜에 예약 가능한 슬롯이 없습니다.",
+    "noAvailableSlots": "선택하신 강사는 현재 예약 가능한 슬롯이 없습니다.",
     "startTime": "시작 시간",
     "endTime": "종료 시간",
     "topic": "주제",

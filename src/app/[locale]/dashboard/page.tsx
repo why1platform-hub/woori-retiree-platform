@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { Card, Badge, ToastContainer, showToast } from "@/components/UI";
+import { Card, Badge } from "@/components/UI";
 
 interface Notice {
   _id: string;
@@ -22,16 +22,10 @@ interface User {
 export default function DashboardPage() {
   const t = useTranslations("dashboard");
   const tNav = useTranslations("nav");
-  const tAuth = useTranslations("auth");
   const locale = useLocale();
   const [notices, setNotices] = useState<Notice[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPasswordField, setNewPasswordField] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [changing, setChanging] = useState(false);
 
   // Role translations
   const getRoleLabel = (role: string) => {
@@ -100,11 +94,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <>
-      <ToastContainer />
-      <div className="grid gap-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">{t("title")}</h1>
+    <div className="grid gap-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">{t("title")}</h1>
         {user && (
           <span className="text-sm text-gray-600">
             {user.name} ({getRoleLabel(user.role)})
@@ -180,48 +172,6 @@ export default function DashboardPage() {
         </div>
       </Card>
 
-      {/* Change Password */}
-      {user && (
-        <Card>
-          <h2 className="mb-3 font-semibold">{tAuth('changePassword')}</h2>
-          <form className="grid gap-3" onSubmit={async (e) => {
-            e.preventDefault();
-            if (!currentPassword || !newPasswordField) {
-              showToast(tAuth('fillAllFields'), 'error');
-              return;
-            }
-            if (newPasswordField !== confirmPassword) {
-              showToast(tAuth('passwordsDoNotMatch'), 'error');
-              return;
-            }
-            setChanging(true);
-            try {
-              const res = await fetch('/api/auth/change-password', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ currentPassword, newPassword: newPasswordField }),
-              });
-              const data = await res.json();
-              if (!res.ok) {
-                showToast(data.message || tAuth('passwordChangeFailed'), 'error');
-              } else {
-                showToast(tAuth('passwordChanged'), 'success');
-                setCurrentPassword(''); setNewPasswordField(''); setConfirmPassword('');
-              }
-            } catch (err) {
-              showToast(tAuth('passwordChangeFailed'), 'error');
-            } finally { setChanging(false); }
-          }}>
-            <input type="password" placeholder={tAuth('currentPassword')} className="rounded border px-3 py-2" value={currentPassword} onChange={(e)=>setCurrentPassword(e.target.value)} required />
-            <input type="password" placeholder={tAuth('newPassword')} className="rounded border px-3 py-2" value={newPasswordField} onChange={(e)=>setNewPasswordField(e.target.value)} required />
-            <input type="password" placeholder={tAuth('confirmPassword')} className="rounded border px-3 py-2" value={confirmPassword} onChange={(e)=>setConfirmPassword(e.target.value)} required />
-            <div className="flex items-center gap-3">
-              <button disabled={changing} className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 disabled:opacity-50">{changing ? '...' : tAuth('changePassword')}</button>
-            </div>
-          </form>
-        </Card>
-      )}
-      </div>
-    </>
+    </div>
   );
 }
