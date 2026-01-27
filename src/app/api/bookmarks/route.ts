@@ -11,7 +11,14 @@ export async function GET() {
 
   await dbConnect();
   const items = await Bookmark.find({ userId: auth!.sub }).populate("jobId").sort({ createdAt: -1 }).lean();
-  return json(items);
+  // Transform to expected format: { _id, job: {...} }
+  const bookmarks = items.map((item: any) => ({
+    _id: item._id,
+    job: item.jobId ? String(item.jobId._id || item.jobId) : null,
+    jobData: item.jobId,
+    createdAt: item.createdAt,
+  }));
+  return json({ bookmarks });
 }
 
 const Body = z.object({ jobId: z.string().min(1) });
@@ -25,11 +32,15 @@ export async function POST(req: Request) {
   if (!parsed.success) return error("Invalid input", 400);
 
   await dbConnect();
-  const created = await Bookmark.create({ userId: auth!.sub, jobId: parsed.data.jobId }).catch((e:any) => {
-    if (String(e?.code) === "11000") return null;
-    throw e;
-  });
-  return json({ ok: true, created: Boolean(created) }, { status: 201 });
+
+  // Check if already bookmarked
+  const existing = await Bookmark.findOne({ userId: auth!.sub, jobId: parsed.data.jobId });
+  if (existing) {
+    return json({ bookmark: { _id: existing._id, job: parsed.data.jobId } }, { status: 200 });
+  }
+
+  const created = await Bookmark.create({ userId: auth!.sub, jobId: parsed.data.jobId });
+  return json({ bookmark: { _id: created._id, job: parsed.data.jobId } }, { status: 201 });
 }
 
 export async function DELETE(req: Request) {
@@ -38,10 +49,20 @@ export async function DELETE(req: Request) {
   if (!gate.ok) return error(gate.message, gate.status);
 
   const { searchParams } = new URL(req.url);
-  const jobId = searchParams.get("jobId");
-  if (!jobId) return error("Missing jobId", 400);
+  const id = searchParams.get("id"); // bookmark _id
+  const jobId = searchParams.get("jobId"); // or job _id
+
+  if (!id && !jobId) return error("Missing id or jobId", 400);
 
   await dbConnect();
-  await Bookmark.deleteOne({ userId: auth!.sub, jobId });
+
+  if (id) {
+    // Delete by bookmark _id
+    await Bookmark.deleteOne({ _id: id, userId: auth!.sub });
+  } else if (jobId) {
+    // Delete by jobId
+    await Bookmark.deleteOne({ userId: auth!.sub, jobId });
+  }
+
   return json({ ok: true });
 }

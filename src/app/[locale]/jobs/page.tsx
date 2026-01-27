@@ -76,7 +76,8 @@ export default function JobsPage() {
     setBookmarking(jobId);
     try {
       if (isBookmarked(jobId)) {
-        const res = await fetch(`/api/bookmarks?id=${getBookmarkId(jobId)}`, { method: "DELETE" });
+        // Delete by jobId directly
+        const res = await fetch(`/api/bookmarks?jobId=${jobId}`, { method: "DELETE" });
         if (res.ok) setBookmarks(bookmarks.filter((b) => b.job !== jobId));
       } else {
         const res = await fetch("/api/bookmarks", {
