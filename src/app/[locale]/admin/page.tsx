@@ -175,6 +175,10 @@ export default function AdminPage() {
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [userEditForm, setUserEditForm] = useState({ name: "", email: "", phone: "", bio: "", organization: "", role: "" });
   const [chatUser, setChatUser] = useState<string | null>(null);
+  const [editingProgram, setEditingProgram] = useState<string | null>(null);
+  const [programEditForm, setProgramEditForm] = useState({
+    name: "", category: "", description: "", imageUrl: "", startDate: "", endDate: "", status: "upcoming"
+  });
   const [editingJob, setEditingJob] = useState<string | null>(null);
   const [editingFaq, setEditingFaq] = useState<string | null>(null);
   const [respondingInquiry, setRespondingInquiry] = useState<string | null>(null);
@@ -500,6 +504,39 @@ export default function AdminPage() {
     if (!confirm("Delete this program?")) return;
     const res = await fetch(`/api/programs?id=${id}`, { method: "DELETE" });
     if (res.ok) setPrograms(programs.filter(p => p._id !== id));
+  };
+
+  const handleUpdateProgram = async (id: string) => {
+    const res = await fetch("/api/programs", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...programEditForm }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setPrograms(programs.map(p => p._id === id ? { ...p, ...updated } : p));
+      setEditingProgram(null);
+      setProgramEditForm({ name: "", category: "", description: "", imageUrl: "", startDate: "", endDate: "", status: "upcoming" });
+    } else {
+      const err = await res.json().catch(() => null);
+      alert(err?.message || "Failed to update program");
+    }
+  };
+
+  const handleProgramEditImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert(locale === 'ko' ? '이미지 크기는 5MB 이하여야 합니다' : 'Image size must be less than 5MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result as string;
+      setProgramEditForm({...programEditForm, imageUrl: base64});
+    };
+    reader.readAsDataURL(file);
   };
 
   // Job handlers
@@ -1036,15 +1073,121 @@ export default function AdminPage() {
             </div>
             <div className="grid gap-3">
               {filteredPrograms.map(program => (
-                <div key={program._id} className="flex items-center justify-between border-b pb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{program.name}</span>
-                      <Badge tone={program.status === "open" ? "green" : program.status === "upcoming" ? "orange" : "gray"}>{program.status}</Badge>
+                <div key={program._id} className="border-b pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {(program as any).imageUrl && (
+                        <img src={(program as any).imageUrl} alt="" className="w-12 h-12 object-cover rounded" />
+                      )}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{program.name}</span>
+                          <Badge tone={program.status === "open" ? "green" : program.status === "upcoming" ? "orange" : "gray"}>{program.status}</Badge>
+                        </div>
+                        <p className="text-sm text-gray-500">{getCategoryLabel(program.category)} | {new Date(program.startDate).toLocaleDateString()} - {new Date(program.endDate).toLocaleDateString()}</p>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-500">{getCategoryLabel(program.category)} | {new Date(program.startDate).toLocaleDateString()} - {new Date(program.endDate).toLocaleDateString()}</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          if (editingProgram === program._id) {
+                            setEditingProgram(null);
+                          } else {
+                            setEditingProgram(program._id);
+                            setProgramEditForm({
+                              name: program.name,
+                              category: program.category,
+                              description: program.description,
+                              imageUrl: (program as any).imageUrl || "",
+                              startDate: new Date(program.startDate).toISOString().split('T')[0],
+                              endDate: new Date(program.endDate).toISOString().split('T')[0],
+                              status: program.status
+                            });
+                          }
+                        }}
+                        className="text-blue-600 hover:underline text-sm"
+                      >
+                        {locale === 'ko' ? '편집' : 'Edit'}
+                      </button>
+                      <button onClick={() => handleDeleteProgram(program._id)} className="text-red-600 hover:underline text-sm">{t("programs.delete")}</button>
+                    </div>
                   </div>
-                  <button onClick={() => handleDeleteProgram(program._id)} className="text-red-600 hover:underline text-sm">{t("programs.delete")}</button>
+
+                  {/* Edit Form */}
+                  {editingProgram === program._id && (
+                    <div className="mt-4 pt-4 border-t bg-gray-50 p-4 rounded">
+                      <h4 className="font-medium mb-3">{locale === 'ko' ? '프로그램 편집' : 'Edit Program'}</h4>
+                      <div className="grid gap-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <label className="text-sm text-gray-600">{t("programs.name")}</label>
+                            <Input value={programEditForm.name} onChange={e => setProgramEditForm({...programEditForm, name: e.target.value})} />
+                          </div>
+                          <div>
+                            <label className="text-sm text-gray-600">{t("programs.category")}</label>
+                            <select value={programEditForm.category} onChange={e => setProgramEditForm({...programEditForm, category: e.target.value})} className="w-full rounded border px-3 py-2">
+                              {categories.map(cat => (
+                                <option key={cat._id} value={cat.name}>{cat.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm text-gray-600">{t("programs.description")}</label>
+                          <RichTextEditor
+                            value={programEditForm.description}
+                            onChange={(val) => setProgramEditForm({...programEditForm, description: val})}
+                            rows={3}
+                            locale={locale}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm text-gray-600 mb-1 block">{locale === 'ko' ? '대표 이미지' : 'Cover Image'}</label>
+                          <div className="flex items-start gap-4">
+                            {programEditForm.imageUrl ? (
+                              <div className="relative">
+                                <img src={programEditForm.imageUrl} alt="Preview" className="w-24 h-18 object-cover rounded border" />
+                                <button
+                                  type="button"
+                                  onClick={() => setProgramEditForm({...programEditForm, imageUrl: ''})}
+                                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs"
+                                >×</button>
+                              </div>
+                            ) : (
+                              <div className="w-24 h-18 border-2 border-dashed rounded flex items-center justify-center text-gray-400 text-xs">
+                                {locale === 'ko' ? '없음' : 'None'}
+                              </div>
+                            )}
+                            <input type="file" accept="image/*" onChange={handleProgramEditImageSelect} className="text-sm" />
+                          </div>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <div>
+                            <label className="text-sm text-gray-600">{t("programs.startDate")}</label>
+                            <Input type="date" value={programEditForm.startDate} onChange={e => setProgramEditForm({...programEditForm, startDate: e.target.value})} />
+                          </div>
+                          <div>
+                            <label className="text-sm text-gray-600">{t("programs.endDate")}</label>
+                            <Input type="date" value={programEditForm.endDate} onChange={e => setProgramEditForm({...programEditForm, endDate: e.target.value})} />
+                          </div>
+                          <div>
+                            <label className="text-sm text-gray-600">{t("programs.status")}</label>
+                            <select value={programEditForm.status} onChange={e => setProgramEditForm({...programEditForm, status: e.target.value})} className="w-full rounded border px-3 py-2">
+                              <option value="upcoming">{t("programs.upcoming")}</option>
+                              <option value="open">{t("programs.open")}</option>
+                              <option value="closed">{t("programs.closed")}</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button onClick={() => handleUpdateProgram(program._id)}>{t("programs.saveChanges")}</Button>
+                          <button onClick={() => { setEditingProgram(null); setProgramEditForm({ name: "", category: "", description: "", imageUrl: "", startDate: "", endDate: "", status: "upcoming" }); }} className="text-gray-600 hover:underline">
+                            {locale === 'ko' ? '취소' : 'Cancel'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {filteredPrograms.length === 0 && programs.length > 0 && (

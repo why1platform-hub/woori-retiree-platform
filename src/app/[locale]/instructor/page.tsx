@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Card, Badge, Button, Input, Textarea } from "@/components/UI";
 import TimeSelect from "@/components/TimeSelect";
 import DateRangePicker from "@/components/DateRangePicker";
+import ImageUploader from "@/components/ImageUploader";
 
 type Tab = "courses" | "resources" | "slots" | "bookings";
 
@@ -427,10 +428,25 @@ export default function InstructorPage() {
                 </select>
               </div>
               <Textarea placeholder={t('placeholders.description')} value={courseForm.description} onChange={e => setCourseForm({...courseForm, description: e.target.value})} rows={2} required />
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Input type="number" placeholder={t('placeholders.duration')} value={courseForm.durationMinutes} onChange={e => setCourseForm({...courseForm, durationMinutes: parseInt(e.target.value) || 0})} required />
-                <Input placeholder={t('placeholders.thumbnailUrl')} value={courseForm.thumbnailUrl} onChange={e => setCourseForm({...courseForm, thumbnailUrl: e.target.value})} />
-                <Input placeholder={t('placeholders.videoUrl')} value={courseForm.videoUrl} onChange={e => setCourseForm({...courseForm, videoUrl: e.target.value})} required />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-sm text-gray-600 mb-1 block">{t('placeholders.duration')}</label>
+                  <Input type="number" placeholder={t('placeholders.duration')} value={courseForm.durationMinutes} onChange={e => setCourseForm({...courseForm, durationMinutes: parseInt(e.target.value) || 0})} required />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 mb-1 block">{t('placeholders.videoUrl')}</label>
+                  <Input placeholder={t('placeholders.videoUrl')} value={courseForm.videoUrl} onChange={e => setCourseForm({...courseForm, videoUrl: e.target.value})} required />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 mb-1 block">{locale === 'ko' ? '썸네일 이미지' : 'Thumbnail Image'}</label>
+                <ImageUploader
+                  value={courseForm.thumbnailUrl}
+                  onChange={(val) => setCourseForm({...courseForm, thumbnailUrl: val})}
+                  locale={locale}
+                  maxWidth={400}
+                  maxHeight={300}
+                />
               </div>
               <Button type="submit">{t('createCourse.button')}</Button>
             </form>
@@ -502,19 +518,25 @@ export default function InstructorPage() {
                             <label className="text-sm text-gray-600">{t('placeholders.description')}</label>
                             <Textarea value={courseEditForm.description} onChange={e => setCourseEditForm({...courseEditForm, description: e.target.value})} rows={2} />
                           </div>
-                          <div className="grid gap-3 sm:grid-cols-3">
+                          <div className="grid gap-3 sm:grid-cols-2">
                             <div>
                               <label className="text-sm text-gray-600">{t('placeholders.duration')}</label>
                               <Input type="number" value={courseEditForm.durationMinutes} onChange={e => setCourseEditForm({...courseEditForm, durationMinutes: parseInt(e.target.value) || 0})} />
                             </div>
                             <div>
-                              <label className="text-sm text-gray-600">{t('placeholders.thumbnailUrl')}</label>
-                              <Input value={courseEditForm.thumbnailUrl} onChange={e => setCourseEditForm({...courseEditForm, thumbnailUrl: e.target.value})} />
-                            </div>
-                            <div>
                               <label className="text-sm text-gray-600">{t('placeholders.videoUrl')}</label>
                               <Input value={courseEditForm.videoUrl} onChange={e => setCourseEditForm({...courseEditForm, videoUrl: e.target.value})} />
                             </div>
+                          </div>
+                          <div>
+                            <label className="text-sm text-gray-600 mb-1 block">{locale === 'ko' ? '썸네일 이미지' : 'Thumbnail Image'}</label>
+                            <ImageUploader
+                              value={courseEditForm.thumbnailUrl}
+                              onChange={(val) => setCourseEditForm({...courseEditForm, thumbnailUrl: val})}
+                              locale={locale}
+                              maxWidth={400}
+                              maxHeight={300}
+                            />
                           </div>
                           <div className="flex gap-2">
                             <Button onClick={() => handleUpdateCourse(course._id)}>{tCourses('save')}</Button>
