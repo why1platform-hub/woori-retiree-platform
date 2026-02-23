@@ -187,7 +187,7 @@ export default function AdminPage() {
   const [inquiryResponse, setInquiryResponse] = useState("");
   const [editingBooking, setEditingBooking] = useState<string | null>(null);
   const [editingSlot, setEditingSlot] = useState<string | null>(null);
-  const [slotEditForm, setSlotEditForm] = useState({ startsAt: "", endsAt: "", topic: "" });
+  const [slotEditForm, setSlotEditForm] = useState({ startsAt: "", endsAt: "", topic: "", instructorId: "" });
   const [bookingEditForm, setBookingEditForm] = useState({ status: "", meetingLink: "", instructorId: "", slotId: "" });
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const [deletingSlots, setDeletingSlots] = useState(false);
@@ -758,15 +758,17 @@ export default function AdminPage() {
   const handleEditSlot = async () => {
     if (!editingSlot) return;
     const body: any = { id: editingSlot };
-    if (slotEditForm.startsAt) body.startsAt = slotEditForm.startsAt;
-    if (slotEditForm.endsAt) body.endsAt = slotEditForm.endsAt;
+    // Convert datetime-local string (browser local time) → UTC ISO for correct storage
+    if (slotEditForm.startsAt) body.startsAt = new Date(slotEditForm.startsAt).toISOString();
+    if (slotEditForm.endsAt) body.endsAt = new Date(slotEditForm.endsAt).toISOString();
     if (slotEditForm.topic) body.topic = slotEditForm.topic;
+    if (slotEditForm.instructorId) body.instructorId = slotEditForm.instructorId;
     const res = await fetch('/api/consultation/slots', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (res.ok) {
       const data = await res.json();
       setSlots(slots.map(s => s._id === data.slot._id ? data.slot : s));
       setEditingSlot(null);
-      setSlotEditForm({ startsAt: '', endsAt: '', topic: '' });
+      setSlotEditForm({ startsAt: '', endsAt: '', topic: '', instructorId: '' });
     } else {
       const err = await res.json().catch(() => null);
       alert(err?.message || `Failed (${res.status})`);
@@ -1956,7 +1958,7 @@ export default function AdminPage() {
                                 <button
                                   onClick={() => {
                                     setEditingSlot(editingSlot === slot._id ? null : slot._id);
-                                    setSlotEditForm({ startsAt: toLocalDT(slot.startsAt), endsAt: toLocalDT(slot.endsAt), topic: slot.topic });
+                                    setSlotEditForm({ startsAt: toLocalDT(slot.startsAt), endsAt: toLocalDT(slot.endsAt), topic: slot.topic, instructorId: String(slot.instructorId?._id || slot.instructorId || '') });
                                   }}
                                   className="text-blue-600 hover:underline text-sm"
                                 >Edit</button>
@@ -1967,14 +1969,30 @@ export default function AdminPage() {
                           {editingSlot === slot._id && (
                             <tr key={`${slot._id}-edit`}>
                               <td colSpan={6} className="px-3 py-3 bg-gray-50 border-b">
-                                <div className="grid gap-2 sm:grid-cols-3">
-                                  <Input type="datetime-local" value={slotEditForm.startsAt} onChange={e => setSlotEditForm({...slotEditForm, startsAt: e.target.value})} />
-                                  <Input type="datetime-local" value={slotEditForm.endsAt} onChange={e => setSlotEditForm({...slotEditForm, endsAt: e.target.value})} />
-                                  <Input placeholder="Topic" value={slotEditForm.topic} onChange={e => setSlotEditForm({...slotEditForm, topic: e.target.value})} />
+                                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                                  <div>
+                                    <label className="block text-xs text-gray-500 mb-1">{locale === 'ko' ? '강사 (변경 시)' : 'Instructor (reassign)'}</label>
+                                    <select value={slotEditForm.instructorId} onChange={e => setSlotEditForm({...slotEditForm, instructorId: e.target.value})} className="rounded border px-2 py-1.5 text-sm w-full">
+                                      <option value="">{locale === 'ko' ? '변경 안 함' : 'Keep current'}</option>
+                                      {instructors.map(ins => <option key={ins._id} value={ins._id}>{ins.name}</option>)}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-500 mb-1">{locale === 'ko' ? '시작 시간' : 'Starts at'}</label>
+                                    <Input type="datetime-local" value={slotEditForm.startsAt} onChange={e => setSlotEditForm({...slotEditForm, startsAt: e.target.value})} />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-500 mb-1">{locale === 'ko' ? '종료 시간' : 'Ends at'}</label>
+                                    <Input type="datetime-local" value={slotEditForm.endsAt} onChange={e => setSlotEditForm({...slotEditForm, endsAt: e.target.value})} />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-500 mb-1">{locale === 'ko' ? '주제' : 'Topic'}</label>
+                                    <Input placeholder="Topic" value={slotEditForm.topic} onChange={e => setSlotEditForm({...slotEditForm, topic: e.target.value})} />
+                                  </div>
                                 </div>
                                 <div className="mt-2 flex gap-2">
                                   <Button onClick={handleEditSlot}>Save</Button>
-                                  <button onClick={() => { setEditingSlot(null); setSlotEditForm({ startsAt: '', endsAt: '', topic: '' }); }} className="text-gray-600 hover:underline text-sm">Cancel</button>
+                                  <button onClick={() => { setEditingSlot(null); setSlotEditForm({ startsAt: '', endsAt: '', topic: '', instructorId: '' }); }} className="text-gray-600 hover:underline text-sm">Cancel</button>
                                 </div>
                               </td>
                             </tr>

@@ -102,8 +102,6 @@ export async function POST(req: Request) {
   }
 
   const createdSlots = [];
-  const baseDate = new Date(date);
-  const finishDate = endDate ? new Date(endDate) : null;
 
   // Parse start and end times
   const [startHour, startMin] = startTime.split(":").map(Number);
@@ -118,88 +116,79 @@ export async function POST(req: Request) {
     return error("End time must be after start time", 400);
   }
 
-  const today = new Date(new Date().setHours(0, 0, 0, 0));
+  // KST = UTC+9. Input times from Korean users are KST, so offset by -9h when storing as UTC.
+  const KST = 9;
+
+  // Helper: build a UTC Date from a UTC-day + local (KST) hours/minutes
+  const makeSlotDate = (utcYear: number, utcMonth: number, utcDay: number, localHour: number, localMin: number) =>
+    new Date(Date.UTC(utcYear, utcMonth, utcDay, localHour - KST, localMin, 0, 0));
+
+  // "today" in KST: midnight KST = 15:00 UTC previous day
+  const nowUTC = new Date();
+  const todayKST = new Date(Date.UTC(nowUTC.getUTCFullYear(), nowUTC.getUTCMonth(), nowUTC.getUTCDate()) - (KST * 3600000));
+  todayKST.setUTCHours(-KST, 0, 0, 0); // midnight KST in UTC
+
+  // Use UTC dates for iteration to avoid DST/TZ issues
+  const [baseYr, baseMo, baseDa] = date.split('-').map(Number);
+  const baseDateUTC = new Date(Date.UTC(baseYr, baseMo - 1, baseDa));
+  const finishDateUTC = endDate
+    ? (() => { const [fy, fm, fd] = endDate.split('-').map(Number); return new Date(Date.UTC(fy, fm - 1, fd)); })()
+    : null;
 
   // If endDate is provided, generate slots for date range
-  if (finishDate) {
-    // Generate slots for each day in the date range
-    const currentDate = new Date(baseDate);
+  if (finishDateUTC) {
+    const currentDate = new Date(baseDateUTC);
     const daysToGenerate = days && days.length > 0 ? days : null;
 
-    while (currentDate <= finishDate) {
-      // If specific days are selected, only generate for those days
-      if (daysToGenerate === null || daysToGenerate.includes(currentDate.getDay())) {
-        // Skip if date is in the past
-        if (currentDate >= today) {
-          // Generate 30-minute slots for this day
+    while (currentDate <= finishDateUTC) {
+      const utcY = currentDate.getUTCFullYear();
+      const utcM = currentDate.getUTCMonth();
+      const utcD = currentDate.getUTCDate();
+      const dayOfWeek = currentDate.getUTCDay();
+
+      if (daysToGenerate === null || daysToGenerate.includes(dayOfWeek)) {
+        const dayMidnightKST = new Date(Date.UTC(utcY, utcM, utcD, -KST, 0, 0, 0));
+        if (dayMidnightKST >= todayKST) {
           for (let mins = startMinutes; mins + slotDuration <= endMinutes; mins += slotDuration) {
-            const slotStart = new Date(currentDate);
-            slotStart.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+            const slotStart = makeSlotDate(utcY, utcM, utcD, Math.floor(mins / 60), mins % 60);
+            const slotEnd = makeSlotDate(utcY, utcM, utcD, Math.floor((mins + slotDuration) / 60), (mins + slotDuration) % 60);
 
-            const slotEnd = new Date(currentDate);
-            slotEnd.setHours(Math.floor((mins + slotDuration) / 60), (mins + slotDuration) % 60, 0, 0);
-
-            // Check if slot already exists
-            const existing = await ConsultationSlot.findOne({
-              instructorId: ownerId,
-              startsAt: slotStart,
-            });
-
+            const existing = await ConsultationSlot.findOne({ instructorId: ownerId, startsAt: slotStart });
             if (!existing) {
-              const created = await ConsultationSlot.create({
-                instructorId: ownerId,
-                startsAt: slotStart,
-                endsAt: slotEnd,
-                topic,
-                isBooked: false,
-              });
+              const created = await ConsultationSlot.create({ instructorId: ownerId, startsAt: slotStart, endsAt: slotEnd, topic, isBooked: false });
               createdSlots.push(created);
             }
           }
         }
       }
-      // Move to next day
-      currentDate.setDate(currentDate.getDate() + 1);
+      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
     }
   } else {
     // Original logic: use weeks parameter
-    const daysToGenerate = days && days.length > 0 ? days : [baseDate.getDay()];
+    const daysToGenerate = days && days.length > 0 ? days : [baseDateUTC.getUTCDay()];
     const weeksToGenerate = weeks || 1;
 
     for (let week = 0; week < weeksToGenerate; week++) {
       for (const dayOfWeek of daysToGenerate) {
-        // Calculate the date for this day
-        const slotDate = new Date(baseDate);
-        const currentDay = slotDate.getDay();
+        const slotDateUTC = new Date(baseDateUTC);
+        const currentDay = slotDateUTC.getUTCDay();
         let daysToAdd = dayOfWeek - currentDay + (week * 7);
         if (daysToAdd < 0 && week === 0) daysToAdd += 7;
-        slotDate.setDate(slotDate.getDate() + daysToAdd);
+        slotDateUTC.setUTCDate(slotDateUTC.getUTCDate() + daysToAdd);
 
-        // Skip if date is in the past
-        if (slotDate < today) continue;
+        const utcY = slotDateUTC.getUTCFullYear();
+        const utcM = slotDateUTC.getUTCMonth();
+        const utcD = slotDateUTC.getUTCDate();
+        const dayMidnightKST = new Date(Date.UTC(utcY, utcM, utcD, -KST, 0, 0, 0));
+        if (dayMidnightKST < todayKST) continue;
 
-        // Generate 30-minute slots
         for (let mins = startMinutes; mins + slotDuration <= endMinutes; mins += slotDuration) {
-          const slotStart = new Date(slotDate);
-          slotStart.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+          const slotStart = makeSlotDate(utcY, utcM, utcD, Math.floor(mins / 60), mins % 60);
+          const slotEnd = makeSlotDate(utcY, utcM, utcD, Math.floor((mins + slotDuration) / 60), (mins + slotDuration) % 60);
 
-          const slotEnd = new Date(slotDate);
-          slotEnd.setHours(Math.floor((mins + slotDuration) / 60), (mins + slotDuration) % 60, 0, 0);
-
-          // Check if slot already exists
-          const existing = await ConsultationSlot.findOne({
-            instructorId: ownerId,
-            startsAt: slotStart,
-          });
-
+          const existing = await ConsultationSlot.findOne({ instructorId: ownerId, startsAt: slotStart });
           if (!existing) {
-            const created = await ConsultationSlot.create({
-              instructorId: ownerId,
-              startsAt: slotStart,
-              endsAt: slotEnd,
-              topic,
-              isBooked: false,
-            });
+            const created = await ConsultationSlot.create({ instructorId: ownerId, startsAt: slotStart, endsAt: slotEnd, topic, isBooked: false });
             createdSlots.push(created);
           }
         }
