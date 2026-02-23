@@ -27,6 +27,7 @@ export default function ConsultationPage() {
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [weeks, setWeeks] = useState(1);
   const [creating, setCreating] = useState(false);
+  const [mySlots, setMySlots] = useState<any[]>([]);
 
   useEffect(() => {
     async function init() {
@@ -56,8 +57,12 @@ export default function ConsultationPage() {
         }
 
         if (currentUser?.role === 'instructor') {
-          const r = await fetch('/api/consultation/bookings?instructor=true');
-          if (r.ok) { const dd = await r.json(); setInstructorRequests(dd.bookings || []); }
+          const [bookingsRes, slotsRes] = await Promise.all([
+            fetch('/api/consultation/bookings?instructor=true'),
+            fetch('/api/consultation/slots?mine=true'),
+          ]);
+          if (bookingsRes.ok) { const dd = await bookingsRes.json(); setInstructorRequests(dd.bookings || []); }
+          if (slotsRes.ok) { const dd = await slotsRes.json(); setMySlots(dd.slots || []); }
         }
       } catch (err) {
         console.error("Failed to load consultation data:", err);
@@ -161,11 +166,31 @@ export default function ConsultationPage() {
         setMsg(data.message || (locale === 'ko' ? '슬롯 생성 실패' : 'Failed to create slots'));
       } else {
         setMsg(locale === 'ko' ? `${data.count}개 슬롯 생성됨` : `Created ${data.count} slots`);
-        const r = await fetch(`/api/consultation/slots?instructorId=${user._id || selectedInstructor}`);
-        if (r.ok) { const dd = await r.json(); setAllSlots(dd.slots || []); }
+        // Refresh own slots list
+        const r = await fetch('/api/consultation/slots?mine=true');
+        if (r.ok) { const dd = await r.json(); setMySlots(dd.slots || []); }
+        // If viewing own instructor slots in main panel, refresh those too
+        if (user._id === selectedInstructor || !selectedInstructor) {
+          const r2 = await fetch(`/api/consultation/slots?instructorId=${user._id}`);
+          if (r2.ok) { const dd = await r2.json(); setAllSlots(dd.slots || []); }
+        }
       }
     } catch { setMsg(locale === 'ko' ? '슬롯 생성 실패' : 'Failed to create slots'); }
     finally { setCreating(false); }
+  }
+
+  async function handleDeleteSlot(slotId: string) {
+    if (!confirm(locale === 'ko' ? '이 슬롯을 삭제하시겠습니까?' : 'Delete this slot?')) return;
+    try {
+      const res = await fetch(`/api/consultation/slots?id=${slotId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setMySlots(prev => prev.filter(s => s._id !== slotId));
+        setMsg(locale === 'ko' ? '슬롯이 삭제되었습니다' : 'Slot deleted');
+      } else {
+        const d = await res.json().catch(() => null);
+        setMsg(d?.message || (locale === 'ko' ? '삭제 실패' : 'Delete failed'));
+      }
+    } catch { setMsg(locale === 'ko' ? '삭제 실패' : 'Delete failed'); }
   }
 
   async function handleInstructorAction(bookingId: string, action: 'approve' | 'reject') {
@@ -245,6 +270,41 @@ export default function ConsultationPage() {
               {creating ? (locale === 'ko' ? '생성 중...' : 'Creating...') : t('createSlots')}
             </Button>
           </div>
+
+          {/* Instructor: My Slots */}
+          {mySlots.length > 0 && (
+            <div className="mt-4 pt-4 border-t">
+              <h3 className="font-medium mb-2">{locale === 'ko' ? '내 상담 슬롯' : 'My Consultation Slots'}</h3>
+              <div className="grid gap-2 max-h-64 overflow-y-auto">
+                {mySlots.map((s) => (
+                  <div key={s._id} className="flex items-center justify-between border rounded px-3 py-2 bg-gray-50 text-sm">
+                    <div>
+                      <span className="font-medium">
+                        {new Date(s.startsAt).toLocaleDateString(locale)} &nbsp;
+                        {new Date(s.startsAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })}
+                        {' — '}
+                        {new Date(s.endsAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })}
+                      </span>
+                      <span className="ml-2 text-gray-500">{s.topic}</span>
+                      {s.isBooked && (
+                        <span className="ml-2 text-xs text-orange-600 bg-orange-50 px-1 rounded">
+                          {locale === 'ko' ? '예약됨' : 'Booked'}
+                        </span>
+                      )}
+                    </div>
+                    {!s.isBooked && (
+                      <button
+                        onClick={() => handleDeleteSlot(s._id)}
+                        className="text-red-500 hover:text-red-700 text-xs ml-2"
+                      >
+                        {locale === 'ko' ? '삭제' : 'Delete'}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Instructor Booking Requests */}
           {instructorRequests.filter(r => r.status === 'pending').length > 0 && (
@@ -334,6 +394,8 @@ export default function ConsultationPage() {
                                     <span className="text-xs text-green-700 px-2 py-1 bg-green-100 rounded">{locale === 'ko' ? '승인됨' : 'Approved'}</span>
                                   ) : isUserPending ? (
                                     <span className="text-xs text-orange-700 px-2 py-1 bg-orange-100 rounded">{locale === 'ko' ? '대기 중' : 'Pending'}</span>
+                                  ) : user?.role === 'instructor' && String(s.instructorId) === String(user._id) ? (
+                                    <span className="text-xs text-gray-400 px-2 py-1">{locale === 'ko' ? '내 슬롯' : 'My slot'}</span>
                                   ) : (
                                     <button className="rounded bg-blue-600 px-3 py-1 text-white text-xs hover:bg-blue-700" onClick={() => handleBook(s._id)}>
                                       {locale === 'ko' ? '예약' : 'Book'}

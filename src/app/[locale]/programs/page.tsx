@@ -15,17 +15,10 @@ interface Program {
   status: "upcoming" | "open" | "closed";
 }
 
-interface Application {
-  _id: string;
-  program: string;
-  status: string;
-}
+interface Application { _id: string; program: string; status: string; }
+interface CategoryItem { _id: string; name: string; label: string; }
 
-interface CategoryItem {
-  _id: string;
-  name: string;
-  label: string;
-}
+type StatusTab = "all" | "open" | "upcoming" | "closed";
 
 export default function ProgramsPage() {
   const t = useTranslations("programs");
@@ -36,11 +29,8 @@ export default function ProgramsPage() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState<string | null>(null);
-
-  // Filters
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [activeTab, setActiveTab] = useState<StatusTab>("all");
 
   useEffect(() => {
     async function fetchData() {
@@ -50,12 +40,11 @@ export default function ProgramsPage() {
           fetch("/api/applications"),
           fetch("/api/categories"),
         ]);
-
         if (programsRes.ok) setPrograms((await programsRes.json()).programs || []);
         if (appsRes.ok) setApplications((await appsRes.json()).applications || []);
         if (catRes.ok) setCategories((await catRes.json()).categories || []);
-      } catch (error) {
-        console.error("Error fetching programs:", error);
+      } catch (err) {
+        console.error("Error fetching programs:", err);
       } finally {
         setLoading(false);
       }
@@ -63,19 +52,27 @@ export default function ProgramsPage() {
     fetchData();
   }, []);
 
+  const getCategoryLabel = (name: string) => categories.find(c => c.name === name)?.label || name;
+
   const filteredPrograms = useMemo(() => {
     let list = programs;
+    if (activeTab !== "all") list = list.filter(p => p.status === activeTab);
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(p => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
     }
-    if (categoryFilter) list = list.filter(p => p.category === categoryFilter);
-    if (statusFilter) list = list.filter(p => p.status === statusFilter);
     return list;
-  }, [programs, search, categoryFilter, statusFilter]);
+  }, [programs, activeTab, search]);
 
-  const hasApplied = (programId: string) => applications.some((app) => app.program === programId);
-  const getApplicationStatus = (programId: string) => applications.find((app) => app.program === programId)?.status;
+  const counts = useMemo(() => ({
+    all: programs.length,
+    open: programs.filter(p => p.status === 'open').length,
+    upcoming: programs.filter(p => p.status === 'upcoming').length,
+    closed: programs.filter(p => p.status === 'closed').length,
+  }), [programs]);
+
+  const hasApplied = (id: string) => applications.some(a => a.program === id);
+  const getAppStatus = (id: string) => applications.find(a => a.program === id)?.status;
 
   const handleApply = async (programId: string) => {
     setApplying(programId);
@@ -87,125 +84,167 @@ export default function ProgramsPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setApplications([...applications, data.application]);
+        setApplications(prev => [...prev, data.application]);
       }
-    } catch (error) {
-      console.error("Error applying:", error);
+    } catch (err) {
+      console.error("Apply error:", err);
     } finally {
       setApplying(null);
     }
   };
 
-  const getStatusTone = (status: string): "green" | "orange" | "gray" => {
-    switch (status) {
-      case "open": return "green";
-      case "upcoming": return "orange";
-      default: return "gray";
-    }
+  const TABS: { key: StatusTab; label: string }[] = [
+    { key: "all", label: locale === 'ko' ? '전체' : 'All' },
+    { key: "open", label: locale === 'ko' ? '모집중' : 'Ongoing' },
+    { key: "upcoming", label: locale === 'ko' ? '마감예정' : 'Closing Soon' },
+    { key: "closed", label: locale === 'ko' ? '종료' : 'Ended' },
+  ];
+
+  const statusColor: Record<string, string> = {
+    open: 'text-green-700 bg-green-50',
+    upcoming: 'text-orange-700 bg-orange-50',
+    closed: 'text-gray-500 bg-gray-100',
   };
 
-  const getCategoryLabel = (category: string) => {
-    const cat = categories.find(c => c.name === category);
-    return cat?.label || category;
-  };
-
-  if (loading) {
-    return (
-      <div className="grid gap-4">
-        <h1 className="text-2xl font-bold">{t("title")}</h1>
-        <p className="text-gray-600">{locale === 'ko' ? '로딩 중...' : 'Loading...'}</p>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-600" />
+    </div>
+  );
 
   return (
     <div className="grid gap-6">
-      <h1 className="text-2xl font-bold">{t("title")}</h1>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <Input
-          placeholder={locale === 'ko' ? '검색...' : 'Search...'}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
-        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="rounded border px-3 py-2">
-          <option value="">{locale === 'ko' ? '전체 카테고리' : 'All Categories'}</option>
-          {categories.map(cat => <option key={cat._id} value={cat.name}>{cat.label}</option>)}
-        </select>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded border px-3 py-2">
-          <option value="">{locale === 'ko' ? '전체 상태' : 'All Status'}</option>
-          <option value="upcoming">{tAdmin("upcoming")}</option>
-          <option value="open">{tAdmin("open")}</option>
-          <option value="closed">{tAdmin("closed")}</option>
-        </select>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">{t("title")}</h1>
+        <p className="text-sm text-gray-500 mt-1">{locale === 'ko' ? '참여 가능한 프로그램을 확인하고 신청하세요.' : 'Browse and apply for available programs.'}</p>
       </div>
 
-      {filteredPrograms.length === 0 ? (
-        <Card>
-          <p className="text-gray-500">{locale === 'ko' ? '프로그램이 없습니다.' : 'No programs available.'}</p>
-        </Card>
-      ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredPrograms.map((program) => (
-            <div key={program._id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-              {/* Cover Image */}
-              <div className="relative h-40 bg-gradient-to-br from-blue-100 to-blue-200">
-                {program.imageUrl ? (
-                  <img
-                    src={program.imageUrl}
-                    alt={program.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-blue-400">
-                    <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                  </div>
-                )}
-                {/* Status Badge */}
-                <div className="absolute top-3 right-3">
-                  <Badge tone={getStatusTone(program.status)}>{tAdmin(program.status)}</Badge>
-                </div>
-                {/* Category */}
-                <div className="absolute bottom-3 left-3">
-                  <span className="bg-white/90 backdrop-blur px-2 py-1 rounded text-xs font-medium text-gray-700">
-                    {getCategoryLabel(program.category)}
-                  </span>
-                </div>
-              </div>
+      <div className="grid gap-6 lg:grid-cols-4">
+        {/* Main content */}
+        <div className="lg:col-span-3 grid gap-4">
+          {/* Status Tabs */}
+          <div className="flex border-b">
+            {TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeTab === tab.key
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                {tab.label}
+                <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab.key ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {counts[tab.key]}
+                </span>
+              </button>
+            ))}
+          </div>
 
-              {/* Content */}
-              <div className="p-4">
-                <h3 className="font-bold text-lg text-gray-900 line-clamp-1">{program.name}</h3>
-                <p className="mt-2 text-sm text-gray-500">
-                  {new Date(program.startDate).toLocaleDateString(locale)} ~ {new Date(program.endDate).toLocaleDateString(locale)}
-                </p>
+          {/* Search */}
+          <Input
+            placeholder={locale === 'ko' ? '프로그램 검색...' : 'Search programs...'}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-sm"
+          />
 
-                {/* Action */}
-                <div className="mt-4">
-                  {hasApplied(program._id) ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">{locale === 'ko' ? '신청됨' : 'Applied'}</span>
-                      <Badge tone={getApplicationStatus(program._id) === "approved" ? "green" : getApplicationStatus(program._id) === "rejected" ? "gray" : "orange"}>
-                        {getApplicationStatus(program._id)}
-                      </Badge>
-                    </div>
-                  ) : program.status === "open" ? (
-                    <Button onClick={() => handleApply(program._id)} disabled={applying === program._id} className="w-full">
-                      {applying === program._id ? "..." : t("apply")}
-                    </Button>
-                  ) : (
-                    <span className="text-sm text-gray-400">{t("unavailable")}</span>
-                  )}
-                </div>
-              </div>
+          {/* Table */}
+          {filteredPrograms.length === 0 ? (
+            <Card>
+              <p className="text-center text-gray-400 py-8">{locale === 'ko' ? '프로그램이 없습니다.' : 'No programs found.'}</p>
+            </Card>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border bg-white">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b">
+                    <th className="text-left px-4 py-3 font-semibold text-gray-700">{locale === 'ko' ? '프로그램명' : 'Program'}</th>
+                    <th className="text-left px-4 py-3 font-semibold text-gray-700">{locale === 'ko' ? '분야' : 'Field'}</th>
+                    <th className="text-left px-4 py-3 font-semibold text-gray-700">{locale === 'ko' ? '모집기간' : 'Period'}</th>
+                    <th className="text-left px-4 py-3 font-semibold text-gray-700">{locale === 'ko' ? '상태' : 'Status'}</th>
+                    <th className="text-left px-4 py-3 font-semibold text-gray-700">{locale === 'ko' ? '신청' : 'Apply'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {filteredPrograms.map(p => {
+                    const applied = hasApplied(p._id);
+                    const appStatus = getAppStatus(p._id);
+                    return (
+                      <tr key={p._id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700">
+                            {getCategoryLabel(p.category)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          {new Date(p.startDate).toLocaleDateString(locale)} ~ {new Date(p.endDate).toLocaleDateString(locale)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${statusColor[p.status] || 'bg-gray-100 text-gray-600'}`}>
+                            {tAdmin(p.status)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {applied ? (
+                            <div className="flex items-center gap-2">
+                              <Badge tone={appStatus === 'approved' ? 'green' : appStatus === 'rejected' ? 'gray' : 'orange'}>
+                                {appStatus || '—'}
+                              </Badge>
+                            </div>
+                          ) : p.status === "open" ? (
+                            <Button
+                              onClick={() => handleApply(p._id)}
+                              disabled={applying === p._id}
+                              className="text-xs px-3 py-1 h-auto"
+                            >
+                              {applying === p._id ? '...' : t("apply")}
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-gray-400">{t("unavailable")}</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          ))}
+          )}
         </div>
-      )}
+
+        {/* Right Sidebar */}
+        <div className="grid gap-4 content-start">
+          <Card>
+            <h3 className="font-bold text-gray-900 mb-3">{locale === 'ko' ? '신청 안내' : 'How to Apply'}</h3>
+            <ol className="space-y-4">
+              {[
+                { step: '01', title: locale === 'ko' ? '프로그램 선택' : 'Select Program', desc: locale === 'ko' ? '원하는 프로그램을 찾으세요.' : 'Find your desired program.' },
+                { step: '02', title: locale === 'ko' ? '신청서 작성' : 'Fill Application', desc: locale === 'ko' ? '신청 버튼을 눌러 접수하세요.' : 'Click Apply to submit.' },
+                { step: '03', title: locale === 'ko' ? '승인 대기' : 'Await Approval', desc: locale === 'ko' ? '담당자 검토 후 승인됩니다.' : 'Review and approval by staff.' },
+              ].map(s => (
+                <li key={s.step} className="flex gap-3">
+                  <span className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">{s.step}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{s.title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{s.desc}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </Card>
+
+          <Card>
+            <h3 className="font-bold text-gray-900 mb-2">{locale === 'ko' ? '문의하기' : 'Contact Us'}</h3>
+            <p className="text-sm text-gray-600 mb-3">{locale === 'ko' ? '프로그램 관련 문의는 고객지원을 이용하세요.' : 'For program inquiries, please use our support center.'}</p>
+            <a href={`/${locale}/support`} className="inline-block text-sm text-blue-600 hover:underline font-medium">
+              {locale === 'ko' ? '고객지원 바로가기 →' : 'Go to Support →'}
+            </a>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

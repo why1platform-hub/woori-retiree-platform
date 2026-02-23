@@ -41,7 +41,7 @@ const Body = z.object({
 
 export async function POST(req: Request) {
   const auth = await getAuthFromCookies();
-  const gate = requireRole(auth, ["user","superadmin"]);
+  const gate = requireRole(auth, ["user", "instructor", "superadmin"]);
   if (!gate.ok) return error(gate.message, gate.status);
 
   const parsed = Body.safeParse(await req.json().catch(() => null));

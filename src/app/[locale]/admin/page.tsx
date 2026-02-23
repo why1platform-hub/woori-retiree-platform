@@ -1524,7 +1524,15 @@ export default function AdminPage() {
                       <p className="text-sm text-gray-700">{new Date(slot.startsAt).toLocaleDateString(locale)} {new Date(slot.startsAt).toLocaleTimeString(locale, {hour: '2-digit', minute: '2-digit', hour12: false})} — {new Date(slot.endsAt).toLocaleTimeString(locale, {hour: '2-digit', minute: '2-digit', hour12: false})}</p>
                     </div>
                     <div className="space-x-2">
-                      <button onClick={() => { setEditingSlot(editingSlot === slot._id ? null : slot._id); setSlotEditForm({ startsAt: new Date(slot.startsAt).toISOString(), endsAt: new Date(slot.endsAt).toISOString(), topic: slot.topic }); }} className="text-blue-600 hover:underline text-sm">Edit</button>
+                      <button onClick={() => {
+                        setEditingSlot(editingSlot === slot._id ? null : slot._id);
+                        const toLocalDT = (iso: string) => {
+                          const d = new Date(iso);
+                          const pad = (n: number) => String(n).padStart(2, '0');
+                          return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                        };
+                        setSlotEditForm({ startsAt: toLocalDT(slot.startsAt), endsAt: toLocalDT(slot.endsAt), topic: slot.topic });
+                      }} className="text-blue-600 hover:underline text-sm">Edit</button>
                       {!slot.isBooked && <button onClick={() => handleDeleteSlot(slot._id)} className="text-red-600 hover:underline text-sm">Delete</button>}
                     </div>
                   </div>
