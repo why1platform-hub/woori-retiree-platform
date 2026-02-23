@@ -18,6 +18,7 @@ export function Navbar() {
   const [me, setMe] = useState<{email:string; role:string; name:string} | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNot, setShowNot] = useState(false);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -123,17 +124,38 @@ export function Navbar() {
                             <div className="text-xs text-gray-500">{new Date(n.createdAt).toLocaleString()}</div>
                           </div>
                           {n.type === 'email_request' && me?.role === 'superadmin' && (
-                            <button className="text-xs text-green-600" onClick={async (e) => {
-                              e.stopPropagation();
-                              const requestId = n.payload?.requestId;
-                              if (!requestId) return;
-                              const res = await fetch('/api/admin/email-requests', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: requestId, action: 'approve' }) });
-                              if (res.ok) {
-                                await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n._id }) });
-                                const r = await fetch('/api/notifications');
-                                if (r.ok) { const d = await r.json(); setNotifications(d.notifications || []); }
-                              }
-                            }}>{t('notifications.approve')}</button>
+                            <button
+                              className={`text-xs px-2 py-0.5 rounded font-medium transition-colors ${approvingId === n._id ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
+                              disabled={approvingId === n._id}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const requestId = String(n.payload?.requestId || '');
+                                if (!requestId) { alert('No request ID found in notification.'); return; }
+                                setApprovingId(n._id);
+                                try {
+                                  const res = await fetch('/api/admin/email-requests', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ id: requestId, action: 'approve' }),
+                                  });
+                                  if (res.ok) {
+                                    // mark notification as read and refresh
+                                    await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n._id }) });
+                                    const r = await fetch('/api/notifications');
+                                    if (r.ok) { const d = await r.json(); setNotifications(d.notifications || []); }
+                                  } else {
+                                    const d = await res.json().catch(() => ({}));
+                                    alert(`Approval failed: ${d.message || res.status}`);
+                                  }
+                                } catch (err) {
+                                  alert('Network error. Please try again.');
+                                } finally {
+                                  setApprovingId(null);
+                                }
+                              }}
+                            >
+                              {approvingId === n._id ? '...' : t('notifications.approve')}
+                            </button>
                           )}
                         </div>
                       ))}

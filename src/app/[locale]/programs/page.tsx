@@ -31,6 +31,8 @@ export default function ProgramsPage() {
   const [applying, setApplying] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<StatusTab>("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -73,6 +75,40 @@ export default function ProgramsPage() {
 
   const hasApplied = (id: string) => applications.some(a => a.program === id);
   const getAppStatus = (id: string) => applications.find(a => a.program === id)?.status;
+
+  const allSelected = filteredPrograms.length > 0 && filteredPrograms.every(p => selected.has(p._id));
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelected(prev => { const s = new Set(prev); filteredPrograms.forEach(p => s.delete(p._id)); return s; });
+    } else {
+      setSelected(prev => { const s = new Set(prev); filteredPrograms.forEach(p => s.add(p._id)); return s; });
+    }
+  };
+  const toggleOne = (id: string) => setSelected(prev => {
+    const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s;
+  });
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    const confirm = window.confirm(
+      locale === 'ko'
+        ? `선택한 ${selected.size}개의 프로그램을 삭제하시겠습니까?`
+        : `Delete ${selected.size} selected program${selected.size > 1 ? 's' : ''}?`
+    );
+    if (!confirm) return;
+    setDeleting(true);
+    try {
+      await Promise.all([...selected].map(id =>
+        fetch(`/api/programs?id=${id}`, { method: 'DELETE' })
+      ));
+      setPrograms(prev => prev.filter(p => !selected.has(p._id)));
+      setSelected(new Set());
+    } catch (err) {
+      console.error('Bulk delete error:', err);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleApply = async (programId: string) => {
     setApplying(programId);
@@ -142,13 +178,37 @@ export default function ProgramsPage() {
             ))}
           </div>
 
-          {/* Search */}
-          <Input
-            placeholder={locale === 'ko' ? '프로그램 검색...' : 'Search programs...'}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-sm"
-          />
+          {/* Search + Bulk Actions */}
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              placeholder={locale === 'ko' ? '프로그램 검색...' : 'Search programs...'}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-sm"
+            />
+            {selected.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">
+                  {locale === 'ko' ? `${selected.size}개 선택됨` : `${selected.size} selected`}
+                </span>
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={deleting}
+                  className="rounded bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+                >
+                  {deleting
+                    ? (locale === 'ko' ? '삭제 중...' : 'Deleting...')
+                    : (locale === 'ko' ? '선택 삭제' : 'Delete Selected')}
+                </button>
+                <button
+                  onClick={() => setSelected(new Set())}
+                  className="rounded border px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  {locale === 'ko' ? '선택 해제' : 'Clear'}
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Table */}
           {filteredPrograms.length === 0 ? (
@@ -160,6 +220,15 @@ export default function ProgramsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b">
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleAll}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        title={locale === 'ko' ? '전체 선택' : 'Select all'}
+                      />
+                    </th>
                     <th className="text-left px-4 py-3 font-semibold text-gray-700">{locale === 'ko' ? '프로그램명' : 'Program'}</th>
                     <th className="text-left px-4 py-3 font-semibold text-gray-700">{locale === 'ko' ? '분야' : 'Field'}</th>
                     <th className="text-left px-4 py-3 font-semibold text-gray-700">{locale === 'ko' ? '모집기간' : 'Period'}</th>
@@ -171,8 +240,17 @@ export default function ProgramsPage() {
                   {filteredPrograms.map(p => {
                     const applied = hasApplied(p._id);
                     const appStatus = getAppStatus(p._id);
+                    const isSelected = selected.has(p._id);
                     return (
-                      <tr key={p._id} className="hover:bg-gray-50 transition-colors">
+                      <tr key={p._id} className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : ''}`}>
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleOne(p._id)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                        </td>
                         <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
                         <td className="px-4 py-3">
                           <span className="px-2 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700">
@@ -189,11 +267,9 @@ export default function ProgramsPage() {
                         </td>
                         <td className="px-4 py-3">
                           {applied ? (
-                            <div className="flex items-center gap-2">
-                              <Badge tone={appStatus === 'approved' ? 'green' : appStatus === 'rejected' ? 'gray' : 'orange'}>
-                                {appStatus || '—'}
-                              </Badge>
-                            </div>
+                            <Badge tone={appStatus === 'approved' ? 'green' : appStatus === 'rejected' ? 'gray' : 'orange'}>
+                              {appStatus || '—'}
+                            </Badge>
                           ) : p.status === "open" ? (
                             <Button
                               onClick={() => handleApply(p._id)}
