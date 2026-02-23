@@ -18,6 +18,14 @@ export async function middleware(req: NextRequest) {
   const locale = pathname.split('/')[1];
   const pathWithoutLocale = pathname.replace(`/${locale}`, '') || '/';
 
+  // If user is already logged in and visiting root or login page, redirect to dashboard
+  if (pathWithoutLocale === '/' || pathWithoutLocale === '/login') {
+    const auth = await getAuthFromRequest(req);
+    if (auth) {
+      return NextResponse.redirect(new URL(`/${locale}/dashboard`, req.url));
+    }
+  }
+
   // Check auth for protected routes
   if (protectedPrefixes.some((p) => pathWithoutLocale.startsWith(p))) {
     const auth = await getAuthFromRequest(req);
