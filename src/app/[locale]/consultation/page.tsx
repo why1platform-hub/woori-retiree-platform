@@ -1,9 +1,102 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Card, Button, Input } from "@/components/UI";
 import TimeSelect from "@/components/TimeSelect";
+
+function CalendarGrid({
+  locale, year, month, selectedDate, onSelectDate,
+  primarySlotDates, otherSlotDates, onPrevMonth, onNextMonth,
+}: {
+  locale: string; year: number; month: number;
+  selectedDate: string | null; onSelectDate: (d: string) => void;
+  primarySlotDates: Set<string>; otherSlotDates: Set<string>;
+  onPrevMonth: () => void; onNextMonth: () => void;
+}) {
+  const touchX = useRef<number | null>(null);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const dayH = locale === 'ko' ? ['일','월','화','수','목','금','토'] : ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const monthName = locale === 'ko'
+    ? `${year}년 ${month + 1}월`
+    : new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const cells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+
+  return (
+    <div
+      onTouchStart={e => { touchX.current = e.touches[0].clientX; }}
+      onTouchEnd={e => {
+        if (touchX.current === null) return;
+        const dx = e.changedTouches[0].clientX - touchX.current;
+        if (Math.abs(dx) > 50) { dx < 0 ? onNextMonth() : onPrevMonth(); }
+        touchX.current = null;
+      }}
+    >
+      {/* Month navigation */}
+      <div className="flex items-center justify-between mb-3">
+        <button onClick={onPrevMonth} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors" aria-label="Previous month">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+        </button>
+        <p className="font-semibold text-gray-800 text-sm">{monthName}</p>
+        <button onClick={onNextMonth} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors" aria-label="Next month">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </button>
+      </div>
+
+      {/* Day headers */}
+      <div className="grid grid-cols-7 text-center text-xs mb-1">
+        {dayH.map(d => <div key={d} className="text-gray-400 py-1 font-medium">{d}</div>)}
+      </div>
+
+      {/* Calendar cells */}
+      <div className="grid grid-cols-7 gap-0.5 text-center text-xs">
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} className="py-2.5" />;
+          const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const cellDate = new Date(year, month, d);
+          const isPast = cellDate < today;
+          const isPrimary = !isPast && primarySlotDates.has(key);
+          const isOther = !isPast && !isPrimary && otherSlotDates.has(key);
+          const isSelected = selectedDate === key;
+          const isToday = cellDate.getTime() === today.getTime();
+          const isClickable = (isPrimary || isOther) && !isPast;
+          return (
+            <div
+              key={i}
+              onClick={() => isClickable && onSelectDate(key)}
+              className={`py-2 rounded-lg flex flex-col items-center transition-all select-none ${
+                isSelected ? 'bg-blue-600 text-white shadow-sm' :
+                isPrimary ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer' :
+                isOther ? 'bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer' :
+                isToday ? 'ring-1 ring-blue-400 font-bold text-gray-800' :
+                isPast ? 'text-gray-300' : 'text-gray-500'
+              }`}
+            >
+              <span className="font-medium leading-tight">{d}</span>
+              {(isPrimary || isOther) && (
+                <span className={`w-1 h-1 rounded-full mt-0.5 ${isSelected ? 'bg-white' : isPrimary ? 'bg-blue-500' : 'bg-gray-400'}`} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 mt-3 text-xs text-gray-500">
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-100 border border-blue-400 inline-block" />
+          {locale === 'ko' ? '선택 강사' : 'Selected'}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-gray-300 inline-block" />
+          {locale === 'ko' ? '다른 강사' : 'Others'}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export default function ConsultationPage() {
   const t = useTranslations("consultations");
@@ -11,15 +104,18 @@ export default function ConsultationPage() {
   const [instructors, setInstructors] = useState<any[]>([]);
   const [selectedInstructor, setSelectedInstructor] = useState<string | null>(null);
   const [allSlots, setAllSlots] = useState<any[]>([]);
+  const [allAvailableSlots, setAllAvailableSlots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
   const [user, setUser] = useState<any | null>(null);
   const [userBookings, setUserBookings] = useState<any[]>([]);
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const [instructorRequests, setInstructorRequests] = useState<any[]>([]);
-  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(new Date().getMonth());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-  // For instructors: create slots
+  // Instructor slot creation state
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("17:00");
@@ -32,10 +128,11 @@ export default function ConsultationPage() {
   useEffect(() => {
     async function init() {
       try {
-        const [insRes, meRes, myBookingsRes] = await Promise.all([
+        const [insRes, meRes, myBookingsRes, allSlotsRes] = await Promise.all([
           fetch('/api/instructors'),
           fetch('/api/me'),
           fetch('/api/consultation/bookings'),
+          fetch('/api/consultation/slots?available=true'),
         ]);
 
         if (insRes.ok) {
@@ -54,6 +151,11 @@ export default function ConsultationPage() {
         if (myBookingsRes.ok) {
           const d = await myBookingsRes.json();
           setUserBookings(d.bookings || []);
+        }
+
+        if (allSlotsRes.ok) {
+          const d = await allSlotsRes.json();
+          setAllAvailableSlots(d.slots || []);
         }
 
         if (currentUser?.role === 'instructor') {
@@ -85,55 +187,91 @@ export default function ConsultationPage() {
     loadSlots();
   }, [selectedInstructor]);
 
-  // Group slots by date
-  const slotsByDay = useMemo(() => {
-    const groups: Record<string, any[]> = {};
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    allSlots.forEach(slot => {
-      const dt = new Date(slot.startsAt);
-      if (dt < today) return; // Skip past dates
-      const dateKey = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-      if (!groups[dateKey]) groups[dateKey] = [];
-      groups[dateKey].push(slot);
-    });
-
-    // Sort each day's slots by time
-    Object.keys(groups).forEach(key => {
-      groups[key].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-    });
-
-    return groups;
-  }, [allSlots]);
-
-  const sortedDays = useMemo(() => Object.keys(slotsByDay).sort(), [slotsByDay]);
-
-  const toggleDay = (dateKey: string) => {
-    setExpandedDays(prev => {
-      const next = new Set(prev);
-      if (next.has(dateKey)) next.delete(dateKey);
-      else next.add(dateKey);
-      return next;
-    });
+  // Month navigation
+  const prevMonth = () => {
+    setSelectedDate(null);
+    if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); }
+    else setCalMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    setSelectedDate(null);
+    if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); }
+    else setCalMonth(m => m + 1);
   };
 
-  const formatDayHeader = (dateKey: string) => {
-    const date = new Date(dateKey + 'T00:00:00');
+  // Dates where selected instructor has available future slots
+  const primarySlotDates = useMemo(() => {
+    const s = new Set<string>();
+    const now = new Date();
+    allSlots.forEach(slot => {
+      if (slot.isBooked) return;
+      const dt = new Date(slot.startsAt);
+      if (dt < now) return;
+      s.add(`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`);
+    });
+    return s;
+  }, [allSlots]);
+
+  // Dates where OTHER instructors have available slots
+  const otherSlotDates = useMemo(() => {
+    const s = new Set<string>();
+    allAvailableSlots.forEach(slot => {
+      const instrId = String(slot.instructorId?._id || slot.instructorId);
+      if (instrId === String(selectedInstructor)) return;
+      const dt = new Date(slot.startsAt);
+      s.add(`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`);
+    });
+    return s;
+  }, [allAvailableSlots, selectedInstructor]);
+
+  // Slots on selected date for selected instructor
+  const slotsOnSelectedDate = useMemo(() => {
+    if (!selectedDate) return [];
+    return allSlots.filter(slot => {
+      const dt = new Date(slot.startsAt);
+      const key = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+      return key === selectedDate;
+    }).sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  }, [allSlots, selectedDate]);
+
+  // Other instructors with slots on selected date
+  const otherInstructorsOnDate = useMemo(() => {
+    if (!selectedDate) return [];
+    const instrMap = new Map<string, { instructor: any; slots: any[] }>();
+    allAvailableSlots.forEach(slot => {
+      const dt = new Date(slot.startsAt);
+      const key = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+      if (key !== selectedDate) return;
+      const instrId = String(slot.instructorId?._id || slot.instructorId);
+      if (instrId === String(selectedInstructor)) return;
+      if (!instrMap.has(instrId)) {
+        const ins = instructors.find(i => String(i._id) === instrId);
+        instrMap.set(instrId, { instructor: ins || { _id: instrId, name: instrId }, slots: [] });
+      }
+      instrMap.get(instrId)!.slots.push(slot);
+    });
+    return [...instrMap.values()];
+  }, [allAvailableSlots, selectedDate, selectedInstructor, instructors]);
+
+  const formatSelectedDate = (key: string) => {
+    const d = new Date(key + 'T00:00:00');
     const dayNames = locale === 'ko'
       ? ['일', '월', '화', '수', '목', '금', '토']
       : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dayName = dayNames[date.getDay()];
     return locale === 'ko'
-      ? `${date.getMonth()+1}월 ${date.getDate()}일 (${dayName})`
-      : `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${dayName})`;
+      ? `${d.getMonth()+1}월 ${d.getDate()}일 (${dayNames[d.getDay()]})`
+      : `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${dayNames[d.getDay()]})`;
   };
 
   async function handleBook(slotId: string) {
     setMsg(null);
     setPending(p => ({ ...p, [slotId]: true }));
     try {
-      const res = await fetch('/api/consultation/bookings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slotId }) });
+      const res = await fetch('/api/consultation/bookings', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slotId })
+      });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         setPending(p => { const np = { ...p }; delete np[slotId]; return np; });
@@ -141,9 +279,10 @@ export default function ConsultationPage() {
       } else {
         setMsg(locale === 'ko' ? '예약이 요청되었습니다!' : 'Booking requested!');
         if (data?.booking) setUserBookings(prev => [data.booking, ...prev]);
-        // Refresh slots
         const r = await fetch(`/api/consultation/slots?instructorId=${selectedInstructor}`);
         if (r.ok) { const dd = await r.json(); setAllSlots(dd.slots || []); }
+        const r2 = await fetch('/api/consultation/slots?available=true');
+        if (r2.ok) { const dd = await r2.json(); setAllAvailableSlots(dd.slots || []); }
       }
     } catch {
       setPending(p => { const np = { ...p }; delete np[slotId]; return np; });
@@ -153,8 +292,7 @@ export default function ConsultationPage() {
 
   async function handleCreateSlots() {
     if (!user || user.role !== 'instructor') return;
-    setCreating(true);
-    setMsg(null);
+    setCreating(true); setMsg(null);
     try {
       const res = await fetch('/api/consultation/slots', {
         method: 'POST',
@@ -166,14 +304,14 @@ export default function ConsultationPage() {
         setMsg(data.message || (locale === 'ko' ? '슬롯 생성 실패' : 'Failed to create slots'));
       } else {
         setMsg(locale === 'ko' ? `${data.count}개 슬롯 생성됨` : `Created ${data.count} slots`);
-        // Refresh own slots list
         const r = await fetch('/api/consultation/slots?mine=true');
         if (r.ok) { const dd = await r.json(); setMySlots(dd.slots || []); }
-        // If viewing own instructor slots in main panel, refresh those too
         if (user._id === selectedInstructor || !selectedInstructor) {
           const r2 = await fetch(`/api/consultation/slots?instructorId=${user._id}`);
           if (r2.ok) { const dd = await r2.json(); setAllSlots(dd.slots || []); }
         }
+        const r3 = await fetch('/api/consultation/slots?available=true');
+        if (r3.ok) { const dd = await r3.json(); setAllAvailableSlots(dd.slots || []); }
       }
     } catch { setMsg(locale === 'ko' ? '슬롯 생성 실패' : 'Failed to create slots'); }
     finally { setCreating(false); }
@@ -218,11 +356,20 @@ export default function ConsultationPage() {
     { value: 6, label: locale === 'ko' ? '토' : 'Sat' },
   ];
 
-  if (loading) return <p className="text-gray-500 p-4">{locale === 'ko' ? '로딩 중...' : 'Loading...'}</p>;
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-600" />
+    </div>
+  );
 
   return (
-    <div className="grid gap-4">
-      <h1 className="text-2xl font-bold">{t('title')}</h1>
+    <div className="grid gap-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          {locale === 'ko' ? '강사를 선택하고 상담 날짜를 예약하세요.' : 'Select an instructor and book a consultation date.'}
+        </p>
+      </div>
 
       {/* Instructor: Create Slots */}
       {user?.role === 'instructor' && (
@@ -271,7 +418,6 @@ export default function ConsultationPage() {
             </Button>
           </div>
 
-          {/* Instructor: My Slots */}
           {mySlots.length > 0 && (
             <div className="mt-4 pt-4 border-t">
               <h3 className="font-medium mb-2">{locale === 'ko' ? '내 상담 슬롯' : 'My Consultation Slots'}</h3>
@@ -287,16 +433,11 @@ export default function ConsultationPage() {
                       </span>
                       <span className="ml-2 text-gray-500">{s.topic}</span>
                       {s.isBooked && (
-                        <span className="ml-2 text-xs text-orange-600 bg-orange-50 px-1 rounded">
-                          {locale === 'ko' ? '예약됨' : 'Booked'}
-                        </span>
+                        <span className="ml-2 text-xs text-orange-600 bg-orange-50 px-1 rounded">{locale === 'ko' ? '예약됨' : 'Booked'}</span>
                       )}
                     </div>
                     {!s.isBooked && (
-                      <button
-                        onClick={() => handleDeleteSlot(s._id)}
-                        className="text-red-500 hover:text-red-700 text-xs ml-2"
-                      >
+                      <button onClick={() => handleDeleteSlot(s._id)} className="text-red-500 hover:text-red-700 text-xs ml-2">
                         {locale === 'ko' ? '삭제' : 'Delete'}
                       </button>
                     )}
@@ -306,7 +447,6 @@ export default function ConsultationPage() {
             </div>
           )}
 
-          {/* Instructor Booking Requests */}
           {instructorRequests.filter(r => r.status === 'pending').length > 0 && (
             <div className="mt-4 pt-4 border-t">
               <h3 className="font-medium mb-2">{locale === 'ko' ? '예약 요청' : 'Booking Requests'}</h3>
@@ -329,94 +469,213 @@ export default function ConsultationPage() {
         </Card>
       )}
 
-      {/* User: Browse & Book Slots */}
-      <Card>
-        <div className="grid gap-3">
-          <div>
-            <label className="block text-sm mb-1">{t('selectInstructor')}</label>
-            <select value={selectedInstructor || ''} onChange={(e) => setSelectedInstructor(e.target.value)} className="w-full rounded border px-3 py-2">
-              {instructors.length === 0 && <option value="">{locale === 'ko' ? '강사 없음' : 'No instructors'}</option>}
-              {instructors.map((ins) => <option key={ins._id} value={ins._id}>{ins.name}</option>)}
-            </select>
-          </div>
+      {/* User: Browse & Book */}
+      <div className="grid gap-4 lg:grid-cols-5">
+        {/* Calendar - 3/5 width on desktop */}
+        <div className="lg:col-span-3">
+          <Card>
+            {/* Instructor selector */}
+            <div className="mb-5">
+              <p className="text-sm font-medium text-gray-700 mb-2">{t('selectInstructor')}</p>
+              {instructors.length === 0 ? (
+                <p className="text-gray-500 text-sm">{locale === 'ko' ? '등록된 강사가 없습니다.' : 'No instructors available.'}</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {instructors.map(ins => (
+                    <button
+                      key={ins._id}
+                      onClick={() => { setSelectedInstructor(ins._id); setSelectedDate(null); }}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        selectedInstructor === ins._id
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:text-blue-600'
+                      }`}
+                    >
+                      {ins.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          <div>
-            <h3 className="font-medium mb-2">{t('availableTimes')}</h3>
+            {/* Calendar grid */}
+            {instructors.length > 0 && (
+              <>
+                <CalendarGrid
+                  locale={locale}
+                  year={calYear}
+                  month={calMonth}
+                  selectedDate={selectedDate}
+                  onSelectDate={setSelectedDate}
+                  primarySlotDates={primarySlotDates}
+                  otherSlotDates={otherSlotDates}
+                  onPrevMonth={prevMonth}
+                  onNextMonth={nextMonth}
+                />
+
+                {/* Hint */}
+                {!selectedDate && primarySlotDates.size > 0 && (
+                  <p className="text-xs text-gray-500 text-center mt-3">
+                    {locale === 'ko' ? '파란색 날짜를 클릭해 시간을 확인하세요.' : 'Tap a highlighted date to see available times.'}
+                  </p>
+                )}
+                {primarySlotDates.size === 0 && selectedInstructor && (
+                  <p className="text-sm text-gray-500 text-center mt-4">{t('noAvailableSlots')}</p>
+                )}
+
+                {/* Selected date slots */}
+                {selectedDate && (
+                  <div className="mt-5 pt-4 border-t">
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+                      {formatSelectedDate(selectedDate)}
+                    </h3>
+
+                    {slotsOnSelectedDate.length === 0 ? (
+                      <p className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center">
+                        {locale === 'ko' ? '이 날짜에 예약 가능한 시간이 없습니다.' : 'No available slots on this date.'}
+                      </p>
+                    ) : (
+                      <div className="grid gap-2">
+                        {slotsOnSelectedDate.map(s => {
+                          const userBooking = userBookings.find(b => String(b.slotId?._id || b.slotId) === String(s._id));
+                          const isUserPending = !!pending[s._id] || (!!userBooking && userBooking.status === 'pending');
+                          const isUserApproved = !!userBooking && userBooking.status === 'approved';
+                          return (
+                            <div key={s._id} className={`flex items-center justify-between rounded-xl border px-4 py-3 transition-colors ${s.isBooked ? 'bg-gray-50 opacity-60' : 'bg-white hover:border-blue-300 hover:shadow-sm'}`}>
+                              <div>
+                                <p className="font-semibold text-sm text-gray-900">
+                                  {new Date(s.startsAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                  {' – '}
+                                  {new Date(s.endsAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-0.5">{s.topic}</p>
+                              </div>
+                              <div>
+                                {s.isBooked ? (
+                                  <span className="text-xs text-gray-500 px-3 py-1.5 bg-gray-200 rounded-full">{locale === 'ko' ? '예약됨' : 'Booked'}</span>
+                                ) : isUserApproved ? (
+                                  <span className="text-xs text-green-700 px-3 py-1.5 bg-green-100 rounded-full">{locale === 'ko' ? '승인됨' : 'Approved'}</span>
+                                ) : isUserPending ? (
+                                  <span className="text-xs text-orange-700 px-3 py-1.5 bg-orange-100 rounded-full">{locale === 'ko' ? '대기 중' : 'Pending'}</span>
+                                ) : user?.role === 'instructor' && String(s.instructorId) === String(user._id) ? (
+                                  <span className="text-xs text-gray-400 px-2 py-1">{locale === 'ko' ? '내 슬롯' : 'My slot'}</span>
+                                ) : (
+                                  <button
+                                    className="rounded-lg bg-blue-600 px-4 py-2 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60"
+                                    onClick={() => handleBook(s._id)}
+                                    disabled={!!pending[s._id]}
+                                  >
+                                    {pending[s._id] ? '...' : (locale === 'ko' ? '예약' : 'Book')}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {msg && (
+                  <p className="text-sm text-blue-700 bg-blue-50 rounded-lg p-3 mt-4">{msg}</p>
+                )}
+              </>
+            )}
+          </Card>
+        </div>
+
+        {/* Right sidebar - 2/5 width on desktop */}
+        <div className="lg:col-span-2 grid gap-4 content-start">
+          {/* Other instructors on selected date */}
+          {selectedDate && otherInstructorsOnDate.length > 0 && (
+            <Card>
+              <h3 className="font-semibold text-gray-800 mb-3 text-sm">
+                {locale === 'ko' ? `${formatSelectedDate(selectedDate)} 다른 강사도 가능` : `Also available on ${formatSelectedDate(selectedDate)}`}
+              </h3>
+              <div className="grid gap-2">
+                {otherInstructorsOnDate.map(({ instructor, slots: iSlots }) => (
+                  <div key={instructor._id} className="rounded-xl border p-3 hover:border-blue-200 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="font-semibold text-sm text-gray-900">{instructor.name}</p>
+                        <p className="text-xs text-green-600 mt-0.5">{iSlots.length} {locale === 'ko' ? '슬롯 가능' : 'slots available'}</p>
+                      </div>
+                      <button
+                        onClick={() => { setSelectedInstructor(instructor._id); }}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-blue-300 text-blue-600 hover:bg-blue-50 transition-colors font-medium"
+                      >
+                        {locale === 'ko' ? '선택' : 'Select'}
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {iSlots.slice(0, 4).map((s: any) => (
+                        <span key={s._id} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                          {new Date(s.startsAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })}
+                        </span>
+                      ))}
+                      {iSlots.length > 4 && <span className="text-xs text-gray-400">+{iSlots.length - 4}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* All instructors overview */}
+          <Card>
+            <h3 className="font-semibold text-gray-800 mb-3 text-sm">{locale === 'ko' ? '강사 목록' : 'Instructors'}</h3>
             {instructors.length === 0 ? (
-              <p className="text-gray-500 text-sm">{locale === 'ko' ? '등록된 강사가 없습니다.' : 'No instructors available.'}</p>
-            ) : sortedDays.length === 0 ? (
-              <p className="text-gray-500 text-sm">{t('noAvailableSlots')}</p>
+              <p className="text-sm text-gray-500">{locale === 'ko' ? '등록된 강사가 없습니다.' : 'No instructors available.'}</p>
             ) : (
               <div className="grid gap-2">
-                {sortedDays.map((dateKey) => {
-                  const daySlots = slotsByDay[dateKey];
-                  const availableCount = daySlots.filter(s => !s.isBooked).length;
-                  const isExpanded = expandedDays.has(dateKey);
-
+                {instructors.map(ins => {
+                  const hasSlots = allAvailableSlots.some(s => String(s.instructorId?._id || s.instructorId) === String(ins._id));
+                  const isSelected = selectedInstructor === ins._id;
                   return (
-                    <div key={dateKey} className="border rounded overflow-hidden">
-                      {/* Day Header - Clickable */}
-                      <button
-                        onClick={() => toggleDay(dateKey)}
-                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
-                          <span className="font-medium">{formatDayHeader(dateKey)}</span>
-                        </div>
-                        <span className="text-sm text-gray-500">
-                          {availableCount > 0
-                            ? (locale === 'ko' ? `${availableCount}개 예약 가능` : `${availableCount} available`)
-                            : (locale === 'ko' ? '예약 불가' : 'Fully booked')}
-                        </span>
-                      </button>
-
-                      {/* Slots - Collapsible */}
-                      {isExpanded && (
-                        <div className="p-3 bg-white grid gap-2">
-                          {daySlots.map((s) => {
-                            const userBooking = userBookings.find(b => String(b.slotId?._id || b.slotId) === String(s._id));
-                            const isUserPending = !!pending[s._id] || (!!userBooking && userBooking.status === 'pending');
-                            const isUserApproved = !!userBooking && userBooking.status === 'approved';
-
-                            return (
-                              <div key={s._id} className="flex items-center justify-between border rounded px-3 py-2 bg-gray-50">
-                                <div>
-                                  <span className="text-sm font-medium">
-                                    {new Date(s.startsAt).toLocaleTimeString(locale, {hour: '2-digit', minute:'2-digit', hour12: false})} - {new Date(s.endsAt).toLocaleTimeString(locale, {hour: '2-digit', minute:'2-digit', hour12: false})}
-                                  </span>
-                                  <span className="text-xs text-gray-500 ml-2">{s.topic}</span>
-                                </div>
-                                <div>
-                                  {s.isBooked ? (
-                                    <span className="text-xs text-gray-500 px-2 py-1 bg-gray-200 rounded">{locale === 'ko' ? '예약됨' : 'Booked'}</span>
-                                  ) : isUserApproved ? (
-                                    <span className="text-xs text-green-700 px-2 py-1 bg-green-100 rounded">{locale === 'ko' ? '승인됨' : 'Approved'}</span>
-                                  ) : isUserPending ? (
-                                    <span className="text-xs text-orange-700 px-2 py-1 bg-orange-100 rounded">{locale === 'ko' ? '대기 중' : 'Pending'}</span>
-                                  ) : user?.role === 'instructor' && String(s.instructorId) === String(user._id) ? (
-                                    <span className="text-xs text-gray-400 px-2 py-1">{locale === 'ko' ? '내 슬롯' : 'My slot'}</span>
-                                  ) : (
-                                    <button className="rounded bg-blue-600 px-3 py-1 text-white text-xs hover:bg-blue-700" onClick={() => handleBook(s._id)}>
-                                      {locale === 'ko' ? '예약' : 'Book'}
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+                    <button
+                      key={ins._id}
+                      onClick={() => { setSelectedInstructor(ins._id); setSelectedDate(null); }}
+                      className={`flex items-center justify-between p-3 rounded-xl border transition-colors text-left w-full ${
+                        isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div>
+                        <p className={`font-medium text-sm ${isSelected ? 'text-blue-700' : 'text-gray-900'}`}>{ins.name}</p>
+                        <p className={`text-xs mt-0.5 ${hasSlots ? 'text-green-600' : 'text-gray-400'}`}>
+                          {hasSlots ? (locale === 'ko' ? '● 예약 가능' : '● Available') : (locale === 'ko' ? '슬롯 없음' : 'No slots')}
+                        </p>
+                      </div>
+                      {isSelected && <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />}
+                    </button>
                   );
                 })}
               </div>
             )}
-          </div>
+          </Card>
 
-          {msg && <p className="text-sm text-blue-700 bg-blue-50 rounded p-2">{msg}</p>}
+          {/* How to book */}
+          <Card>
+            <h3 className="font-semibold text-gray-800 mb-3 text-sm">{locale === 'ko' ? '예약 방법' : 'How to Book'}</h3>
+            <ol className="space-y-3">
+              {[
+                { n: '1', t: locale === 'ko' ? '강사 선택' : 'Select Instructor', d: locale === 'ko' ? '원하는 강사를 선택하세요.' : 'Choose your instructor.' },
+                { n: '2', t: locale === 'ko' ? '날짜 선택' : 'Pick a Date', d: locale === 'ko' ? '파란 날짜를 클릭하세요.' : 'Click a highlighted date.' },
+                { n: '3', t: locale === 'ko' ? '시간 예약' : 'Book a Time', d: locale === 'ko' ? '예약 버튼을 눌러 요청하세요.' : 'Press Book to submit request.' },
+              ].map(s => (
+                <li key={s.n} className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">{s.n}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{s.t}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{s.d}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </Card>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

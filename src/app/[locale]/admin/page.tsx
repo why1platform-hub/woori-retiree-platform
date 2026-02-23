@@ -191,6 +191,18 @@ export default function AdminPage() {
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const [deletingSlots, setDeletingSlots] = useState(false);
 
+  // Bulk selection states for other sections
+  const [selectedNotices, setSelectedNotices] = useState<Set<string>>(new Set());
+  const [deletingNotices, setDeletingNotices] = useState(false);
+  const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
+  const [deletingJobs, setDeletingJobs] = useState(false);
+  const [selectedCourses, setSelectedCourses] = useState<Set<string>>(new Set());
+  const [deletingCourses, setDeletingCourses] = useState(false);
+  const [selectedFaqs, setSelectedFaqs] = useState<Set<string>>(new Set());
+  const [deletingFaqs, setDeletingFaqs] = useState(false);
+  const [selectedInquiries, setSelectedInquiries] = useState<Set<string>>(new Set());
+  const [deletingInquiries, setDeletingInquiries] = useState(false);
+
   const [loadedTabs, setLoadedTabs] = useState<Set<Tab>>(new Set());
 
   // Fetch categories on mount
@@ -679,6 +691,66 @@ export default function AdminPage() {
     }
   };
 
+  const handleBulkDeleteNotices = async () => {
+    if (selectedNotices.size === 0) return;
+    if (!confirm(`Delete ${selectedNotices.size} notice(s)?`)) return;
+    setDeletingNotices(true);
+    try {
+      await Promise.all([...selectedNotices].map(id => fetch(`/api/notices?id=${id}`, { method: 'DELETE' })));
+      setNotices(prev => prev.filter(n => !selectedNotices.has(n._id)));
+      setSelectedNotices(new Set());
+    } catch { alert('Some notices could not be deleted.'); }
+    finally { setDeletingNotices(false); }
+  };
+
+  const handleBulkDeleteJobs = async () => {
+    if (selectedJobs.size === 0) return;
+    if (!confirm(`Delete ${selectedJobs.size} job(s)?`)) return;
+    setDeletingJobs(true);
+    try {
+      await Promise.all([...selectedJobs].map(id => fetch(`/api/jobs?id=${id}`, { method: 'DELETE' })));
+      setJobs(prev => prev.filter(j => !selectedJobs.has(j._id)));
+      setSelectedJobs(new Set());
+    } catch { alert('Some jobs could not be deleted.'); }
+    finally { setDeletingJobs(false); }
+  };
+
+  const handleBulkDeleteCourses = async () => {
+    if (selectedCourses.size === 0) return;
+    if (!confirm(`Delete ${selectedCourses.size} course(s)?`)) return;
+    setDeletingCourses(true);
+    try {
+      await Promise.all([...selectedCourses].map(id => fetch(`/api/courses?id=${id}`, { method: 'DELETE' })));
+      setCourses(prev => prev.filter(c => !selectedCourses.has(c._id)));
+      setSelectedCourses(new Set());
+    } catch { alert('Some courses could not be deleted.'); }
+    finally { setDeletingCourses(false); }
+  };
+
+  const handleBulkDeleteFaqs = async () => {
+    if (selectedFaqs.size === 0) return;
+    if (!confirm(`Delete ${selectedFaqs.size} FAQ(s)?`)) return;
+    setDeletingFaqs(true);
+    try {
+      await Promise.all([...selectedFaqs].map(id => fetch(`/api/support/faq?id=${id}`, { method: 'DELETE' })));
+      setFaqs(prev => prev.filter(f => !selectedFaqs.has(f._id)));
+      setSelectedFaqs(new Set());
+    } catch { alert('Some FAQs could not be deleted.'); }
+    finally { setDeletingFaqs(false); }
+  };
+
+  const handleBulkDeleteInquiries = async () => {
+    if (selectedInquiries.size === 0) return;
+    if (!confirm(`Delete ${selectedInquiries.size} inquiry/inquiries?`)) return;
+    setDeletingInquiries(true);
+    try {
+      await Promise.all([...selectedInquiries].map(id => fetch(`/api/support/inquiries?id=${id}`, { method: 'DELETE' })));
+      setInquiries(prev => prev.filter(i => !selectedInquiries.has(i._id)));
+      setSelectedInquiries(new Set());
+    } catch { alert('Some inquiries could not be deleted.'); }
+    finally { setDeletingInquiries(false); }
+  };
+
   const handleEditSlot = async () => {
     if (!editingSlot) return;
     const body: any = { id: editingSlot };
@@ -903,8 +975,38 @@ export default function AdminPage() {
           </Card>
 
           <Card>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">{t("notices.noticesList")}</h3>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <h3 className="font-semibold">{t("notices.noticesList")}</h3>
+                {filteredNotices.length > 0 && (
+                  <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={filteredNotices.length > 0 && filteredNotices.every(n => selectedNotices.has(n._id))}
+                      onChange={() => {
+                        if (filteredNotices.every(n => selectedNotices.has(n._id))) {
+                          setSelectedNotices(new Set());
+                        } else {
+                          setSelectedNotices(new Set(filteredNotices.map(n => n._id)));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    {locale === 'ko' ? '전체 선택' : 'Select All'}
+                  </label>
+                )}
+                {selectedNotices.size > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">{selectedNotices.size} {locale === 'ko' ? '개 선택됨' : 'selected'}</span>
+                    <button onClick={handleBulkDeleteNotices} disabled={deletingNotices} className="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700 disabled:opacity-50">
+                      {deletingNotices ? '...' : (locale === 'ko' ? '선택 삭제' : 'Delete Selected')}
+                    </button>
+                    <button onClick={() => setSelectedNotices(new Set())} className="rounded border px-3 py-1 text-sm text-gray-600 hover:bg-gray-50">
+                      {locale === 'ko' ? '해제' : 'Clear'}
+                    </button>
+                  </div>
+                )}
+              </div>
               <Input
                 placeholder={locale === 'ko' ? '제목 검색...' : 'Search title...'}
                 value={noticeSearch}
@@ -914,15 +1016,23 @@ export default function AdminPage() {
             </div>
             <div className="grid gap-3">
               {filteredNotices.map(notice => (
-                <div key={notice._id} className="flex items-start justify-between border-b pb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{notice.title}</span>
-                      <Badge tone={notice.badge === "urgent" ? "orange" : "blue"}>{notice.badge}</Badge>
+                <div key={notice._id} className={`flex items-start gap-3 border-b pb-3 ${selectedNotices.has(notice._id) ? 'bg-blue-50 -mx-2 px-2 rounded' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={selectedNotices.has(notice._id)}
+                    onChange={() => setSelectedNotices(prev => { const s = new Set(prev); s.has(notice._id) ? s.delete(notice._id) : s.add(notice._id); return s; })}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 mt-1 cursor-pointer flex-shrink-0"
+                  />
+                  <div className="flex-1 flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{notice.title}</span>
+                        <Badge tone={notice.badge === "urgent" ? "orange" : "blue"}>{notice.badge}</Badge>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{notice.body}</p>
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">{notice.body}</p>
+                    <button onClick={() => handleDeleteNotice(notice._id)} className="text-red-600 hover:underline text-sm flex-shrink-0 ml-2">{t("notices.delete")}</button>
                   </div>
-                  <button onClick={() => handleDeleteNotice(notice._id)} className="text-red-600 hover:underline text-sm">{t("notices.delete")}</button>
                 </div>
               ))}
             </div>
@@ -1268,8 +1378,38 @@ export default function AdminPage() {
           </Card>
 
           <Card>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">{t("jobs.jobsList")}</h3>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <h3 className="font-semibold">{t("jobs.jobsList")}</h3>
+                {filteredJobs.length > 0 && (
+                  <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={filteredJobs.length > 0 && filteredJobs.every(j => selectedJobs.has(j._id))}
+                      onChange={() => {
+                        if (filteredJobs.every(j => selectedJobs.has(j._id))) {
+                          setSelectedJobs(new Set());
+                        } else {
+                          setSelectedJobs(new Set(filteredJobs.map(j => j._id)));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    {locale === 'ko' ? '전체 선택' : 'Select All'}
+                  </label>
+                )}
+                {selectedJobs.size > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">{selectedJobs.size} {locale === 'ko' ? '개 선택됨' : 'selected'}</span>
+                    <button onClick={handleBulkDeleteJobs} disabled={deletingJobs} className="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700 disabled:opacity-50">
+                      {deletingJobs ? '...' : (locale === 'ko' ? '선택 삭제' : 'Delete Selected')}
+                    </button>
+                    <button onClick={() => setSelectedJobs(new Set())} className="rounded border px-3 py-1 text-sm text-gray-600 hover:bg-gray-50">
+                      {locale === 'ko' ? '해제' : 'Clear'}
+                    </button>
+                  </div>
+                )}
+              </div>
               <Input
                 placeholder={locale === 'ko' ? '제목/회사 검색...' : 'Search title/company...'}
                 value={jobSearch}
@@ -1279,13 +1419,21 @@ export default function AdminPage() {
             </div>
             <div className="grid gap-3">
               {filteredJobs.map(job => (
-                <div key={job._id} className="flex items-center justify-between border-b pb-3">
-                  <div>
-                    <span className="font-medium">{job.title}</span>
-                    <span className="text-gray-600"> at {job.company}</span>
-                    <p className="text-sm text-gray-500">{job.location} | {job.employmentType} | {job.salary}</p>
+                <div key={job._id} className={`flex items-center gap-3 border-b pb-3 ${selectedJobs.has(job._id) ? 'bg-blue-50 -mx-2 px-2 rounded' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={selectedJobs.has(job._id)}
+                    onChange={() => setSelectedJobs(prev => { const s = new Set(prev); s.has(job._id) ? s.delete(job._id) : s.add(job._id); return s; })}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer flex-shrink-0"
+                  />
+                  <div className="flex-1 flex items-center justify-between">
+                    <div>
+                      <span className="font-medium">{job.title}</span>
+                      <span className="text-gray-600"> at {job.company}</span>
+                      <p className="text-sm text-gray-500">{job.location} | {job.employmentType} | {job.salary}</p>
+                    </div>
+                    <button onClick={() => handleDeleteJob(job._id)} className="text-red-600 hover:underline text-sm flex-shrink-0 ml-2">{t("jobs.delete")}</button>
                   </div>
-                  <button onClick={() => handleDeleteJob(job._id)} className="text-red-600 hover:underline text-sm">{t("jobs.delete")}</button>
                 </div>
               ))}
               {filteredJobs.length === 0 && jobs.length > 0 && (
@@ -1299,8 +1447,23 @@ export default function AdminPage() {
       {/* Courses Tab */}
       {activeTab === "courses" && (
         <Card>
-          <h3 className="mb-4 font-semibold">{t("courses.title")}</h3>
-          <p className="text-sm text-gray-600 mb-4">{t("courses.createdByInstructors")}</p>
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <h3 className="font-semibold">{t("courses.title")}</h3>
+              <p className="text-sm text-gray-600 mt-1">{t("courses.createdByInstructors")}</p>
+            </div>
+            {selectedCourses.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">{selectedCourses.size} {locale === 'ko' ? '개 선택됨' : 'selected'}</span>
+                <button onClick={handleBulkDeleteCourses} disabled={deletingCourses} className="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700 disabled:opacity-50">
+                  {deletingCourses ? '...' : (locale === 'ko' ? '선택 삭제' : 'Delete Selected')}
+                </button>
+                <button onClick={() => setSelectedCourses(new Set())} className="rounded border px-3 py-1 text-sm text-gray-600 hover:bg-gray-50">
+                  {locale === 'ko' ? '해제' : 'Clear'}
+                </button>
+              </div>
+            )}
+          </div>
           <div className="flex flex-wrap gap-3 mb-4">
             <Input
               placeholder={locale === 'ko' ? '제목 검색...' : 'Search title...'}
@@ -1314,14 +1477,38 @@ export default function AdminPage() {
                 <option key={cat._id} value={cat.name}>{cat.label}</option>
               ))}
             </select>
+            {filteredCourses.length > 0 && (
+              <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={filteredCourses.length > 0 && filteredCourses.every(c => selectedCourses.has(c._id))}
+                  onChange={() => {
+                    if (filteredCourses.every(c => selectedCourses.has(c._id))) {
+                      setSelectedCourses(new Set());
+                    } else {
+                      setSelectedCourses(new Set(filteredCourses.map(c => c._id)));
+                    }
+                  }}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                />
+                {locale === 'ko' ? '전체 선택' : 'Select All'}
+              </label>
+            )}
           </div>
           {filteredCourses.length === 0 ? (
             <p className="text-gray-500">{courses.length === 0 ? t("courses.noCourses") : (locale === 'ko' ? '검색 결과가 없습니다.' : 'No matching courses.')}</p>
           ) : (
             <div className="grid gap-3">
               {filteredCourses.map(course => (
-                <div key={course._id} className="border-b pb-3">
-                  <div className="flex items-center justify-between">
+                <div key={course._id} className={`border-b pb-3 ${selectedCourses.has(course._id) ? 'bg-blue-50 -mx-2 px-2 rounded' : ''}`}>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedCourses.has(course._id)}
+                      onChange={() => setSelectedCourses(prev => { const s = new Set(prev); s.has(course._id) ? s.delete(course._id) : s.add(course._id); return s; })}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer flex-shrink-0"
+                    />
+                    <div className="flex-1 flex items-center justify-between">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{course.title}</span>
@@ -1356,6 +1543,7 @@ export default function AdminPage() {
                         {t("courses.edit")}
                       </button>
                       <button onClick={() => handleDeleteCourse(course._id)} className="text-red-600 hover:underline text-sm">{t("courses.delete")}</button>
+                    </div>
                     </div>
                   </div>
 
@@ -1430,16 +1618,56 @@ export default function AdminPage() {
           </Card>
 
           <Card>
-            <h3 className="mb-4 font-semibold">{t("faqs.faqsList")}</h3>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <h3 className="font-semibold">{t("faqs.faqsList")}</h3>
+                {faqs.length > 0 && (
+                  <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={faqs.length > 0 && faqs.every(f => selectedFaqs.has(f._id))}
+                      onChange={() => {
+                        if (faqs.every(f => selectedFaqs.has(f._id))) {
+                          setSelectedFaqs(new Set());
+                        } else {
+                          setSelectedFaqs(new Set(faqs.map(f => f._id)));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    {locale === 'ko' ? '전체 선택' : 'Select All'}
+                  </label>
+                )}
+                {selectedFaqs.size > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">{selectedFaqs.size} {locale === 'ko' ? '개 선택됨' : 'selected'}</span>
+                    <button onClick={handleBulkDeleteFaqs} disabled={deletingFaqs} className="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700 disabled:opacity-50">
+                      {deletingFaqs ? '...' : (locale === 'ko' ? '선택 삭제' : 'Delete Selected')}
+                    </button>
+                    <button onClick={() => setSelectedFaqs(new Set())} className="rounded border px-3 py-1 text-sm text-gray-600 hover:bg-gray-50">
+                      {locale === 'ko' ? '해제' : 'Clear'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
             <div className="grid gap-3">
               {faqs.map(faq => (
-                <div key={faq._id} className="border-b pb-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium">{faq.question}</p>
-                      <p className="text-sm text-gray-600 mt-1">{faq.answer}</p>
+                <div key={faq._id} className={`border-b pb-3 ${selectedFaqs.has(faq._id) ? 'bg-blue-50 -mx-2 px-2 rounded' : ''}`}>
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedFaqs.has(faq._id)}
+                      onChange={() => setSelectedFaqs(prev => { const s = new Set(prev); s.has(faq._id) ? s.delete(faq._id) : s.add(faq._id); return s; })}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 mt-1 cursor-pointer flex-shrink-0"
+                    />
+                    <div className="flex-1 flex items-start justify-between">
+                      <div>
+                        <p className="font-medium">{faq.question}</p>
+                        <p className="text-sm text-gray-600 mt-1">{faq.answer}</p>
+                      </div>
+                      <button onClick={() => handleDeleteFaq(faq._id)} className="text-red-600 hover:underline text-sm flex-shrink-0 ml-2">{t("faqs.delete")}</button>
                     </div>
-                    <button onClick={() => handleDeleteFaq(faq._id)} className="text-red-600 hover:underline text-sm">{t("faqs.delete")}</button>
                   </div>
                 </div>
               ))}
@@ -1451,8 +1679,38 @@ export default function AdminPage() {
       {/* Inquiries Tab */}
       {activeTab === "inquiries" && (
         <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold">Support Inquiries</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <h3 className="font-semibold">Support Inquiries</h3>
+              {filteredInquiries.length > 0 && (
+                <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={filteredInquiries.length > 0 && filteredInquiries.every(i => selectedInquiries.has(i._id))}
+                    onChange={() => {
+                      if (filteredInquiries.every(i => selectedInquiries.has(i._id))) {
+                        setSelectedInquiries(new Set());
+                      } else {
+                        setSelectedInquiries(new Set(filteredInquiries.map(i => i._id)));
+                      }
+                    }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                  />
+                  {locale === 'ko' ? '전체 선택' : 'Select All'}
+                </label>
+              )}
+              {selectedInquiries.size > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">{selectedInquiries.size} {locale === 'ko' ? '개 선택됨' : 'selected'}</span>
+                  <button onClick={handleBulkDeleteInquiries} disabled={deletingInquiries} className="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700 disabled:opacity-50">
+                    {deletingInquiries ? '...' : (locale === 'ko' ? '선택 삭제' : 'Delete Selected')}
+                  </button>
+                  <button onClick={() => setSelectedInquiries(new Set())} className="rounded border px-3 py-1 text-sm text-gray-600 hover:bg-gray-50">
+                    {locale === 'ko' ? '해제' : 'Clear'}
+                  </button>
+                </div>
+              )}
+            </div>
             <Input
               placeholder={locale === 'ko' ? '제목 검색...' : 'Search subject...'}
               value={inquirySearch}
@@ -1465,8 +1723,15 @@ export default function AdminPage() {
           ) : (
             <div className="grid gap-4">
               {filteredInquiries.map(inquiry => (
-                <div key={inquiry._id} className="border-b pb-4">
-                  <div className="flex items-start justify-between">
+                <div key={inquiry._id} className={`border-b pb-4 ${selectedInquiries.has(inquiry._id) ? 'bg-blue-50 -mx-2 px-2 rounded' : ''}`}>
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedInquiries.has(inquiry._id)}
+                      onChange={() => setSelectedInquiries(prev => { const s = new Set(prev); s.has(inquiry._id) ? s.delete(inquiry._id) : s.add(inquiry._id); return s; })}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 mt-1 cursor-pointer flex-shrink-0"
+                    />
+                  <div className="flex-1 flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{inquiry.subject}</span>
@@ -1504,6 +1769,7 @@ export default function AdminPage() {
                         Respond
                       </button>
                     )}
+                  </div>
                   </div>
                 </div>
               ))}

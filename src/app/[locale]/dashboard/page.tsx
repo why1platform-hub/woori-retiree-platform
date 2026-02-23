@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { Card, Badge } from "@/components/UI";
@@ -12,12 +12,28 @@ interface User { _id: string; name: string; email: string; role: string; }
 interface Application { _id: string; status: string; }
 interface Booking { _id: string; status: string; slotId?: { startsAt: string; endsAt: string }; }
 
-// Simple mini calendar
-function MiniCalendar({ locale }: { locale: string }) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const today = now.getDate();
+type EventType = 'booking' | 'program' | 'both';
+
+function MiniCalendar({
+  locale,
+  year,
+  month,
+  onPrevMonth,
+  onNextMonth,
+  eventDates,
+}: {
+  locale: string;
+  year: number;
+  month: number;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
+  eventDates: Record<string, EventType>;
+}) {
+  const touchX = useRef<number | null>(null);
+  const today = new Date();
+  const todayDate = today.getDate();
+  const todayMonth = today.getMonth();
+  const todayYear = today.getFullYear();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
@@ -27,20 +43,80 @@ function MiniCalendar({ locale }: { locale: string }) {
 
   const monthName = locale === 'ko'
     ? `${year}년 ${month + 1}월`
-    : now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    : new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const cells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
 
   return (
-    <div>
-      <p className="text-sm font-semibold text-center mb-2 text-gray-700">{monthName}</p>
+    <div
+      onTouchStart={e => { touchX.current = e.touches[0].clientX; }}
+      onTouchEnd={e => {
+        if (touchX.current === null) return;
+        const dx = e.changedTouches[0].clientX - touchX.current;
+        if (Math.abs(dx) > 50) { dx < 0 ? onNextMonth() : onPrevMonth(); }
+        touchX.current = null;
+      }}
+    >
+      {/* Month navigation */}
+      <div className="flex items-center justify-between mb-2">
+        <button
+          onClick={onPrevMonth}
+          className="p-1 rounded hover:bg-gray-100 text-gray-500 transition-colors"
+          aria-label="Previous month"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <p className="text-sm font-semibold text-center text-gray-700">{monthName}</p>
+        <button
+          onClick={onNextMonth}
+          className="p-1 rounded hover:bg-gray-100 text-gray-500 transition-colors"
+          aria-label="Next month"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Day headers */}
       <div className="grid grid-cols-7 gap-px text-center text-xs">
         {dayHeaders.map(d => <div key={d} className="text-gray-400 pb-1 font-medium">{d}</div>)}
-        {cells.map((d, i) => (
-          <div key={i} className={`py-1 rounded ${d === today ? 'bg-blue-600 text-white font-bold' : d ? 'text-gray-700 hover:bg-gray-100' : ''}`}>
-            {d || ''}
-          </div>
-        ))}
+      </div>
+
+      {/* Calendar cells */}
+      <div className="grid grid-cols-7 gap-px text-center text-xs">
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} />;
+          const isToday = d === todayDate && month === todayMonth && year === todayYear;
+          const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const eventType = eventDates[dateKey];
+          return (
+            <div
+              key={i}
+              className={`py-1 rounded flex flex-col items-center ${isToday ? 'bg-blue-600 text-white font-bold' : d ? 'text-gray-700 hover:bg-gray-100' : ''}`}
+            >
+              <span className="leading-tight">{d}</span>
+              {eventType && (
+                <div className="flex gap-px mt-0.5 justify-center">
+                  {(eventType === 'booking' || eventType === 'both') && (
+                    <span className={`w-1 h-1 rounded-full ${isToday ? 'bg-white' : 'bg-blue-500'}`} />
+                  )}
+                  {(eventType === 'program' || eventType === 'both') && (
+                    <span className={`w-1 h-1 rounded-full ${isToday ? 'bg-yellow-200' : 'bg-orange-500'}`} />
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-3 mt-2 justify-center text-xs text-gray-500">
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />{locale === 'ko' ? '상담' : 'Consult'}</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500 inline-block" />{locale === 'ko' ? '프로그램' : 'Program'}</span>
       </div>
     </div>
   );
@@ -55,6 +131,8 @@ export default function DashboardPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(new Date().getMonth());
 
   const T = {
     welcome: locale === 'ko' ? '안녕하세요' : 'Welcome',
@@ -114,8 +192,41 @@ export default function DashboardPage() {
   };
 
   const approvedCount = applications.filter(a => a.status === 'approved').length;
-  const pendingApps = applications.filter(a => a.status === 'pending').length;
   const approvedBookings = bookings.filter(b => b.status === 'approved').length;
+
+  // Build event dates for calendar: booking dates (blue) and program deadlines (orange)
+  const eventDates = useMemo(() => {
+    const map: Record<string, EventType> = {};
+    const toKey = (iso: string) => {
+      const d = new Date(iso);
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    };
+
+    bookings.forEach(b => {
+      if (b.slotId?.startsAt) {
+        const key = toKey(b.slotId.startsAt);
+        map[key] = map[key] === 'program' ? 'both' : 'booking';
+      }
+    });
+
+    programs.forEach(p => {
+      if (p.status !== 'closed') {
+        const key = toKey(p.endDate);
+        map[key] = map[key] === 'booking' ? 'both' : 'program';
+      }
+    });
+
+    return map;
+  }, [bookings, programs]);
+
+  const prevMonth = () => {
+    if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); }
+    else setCalMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); }
+    else setCalMonth(m => m + 1);
+  };
 
   const quickLinks = [
     { href: `/${locale}/programs`, label: locale === 'ko' ? '프로그램 신청' : 'Programs', icon: '📋', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200' },
@@ -237,7 +348,14 @@ export default function DashboardPage() {
           {/* Calendar */}
           <Card>
             <h2 className="font-bold text-gray-900 mb-3">{T.thisMonth}</h2>
-            <MiniCalendar locale={locale} />
+            <MiniCalendar
+              locale={locale}
+              year={calYear}
+              month={calMonth}
+              onPrevMonth={prevMonth}
+              onNextMonth={nextMonth}
+              eventDates={eventDates}
+            />
           </Card>
 
           {/* Recommended Jobs */}
