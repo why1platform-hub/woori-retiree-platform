@@ -188,6 +188,8 @@ export default function AdminPage() {
   const [editingSlot, setEditingSlot] = useState<string | null>(null);
   const [slotEditForm, setSlotEditForm] = useState({ startsAt: "", endsAt: "", topic: "" });
   const [bookingEditForm, setBookingEditForm] = useState({ status: "", meetingLink: "", instructorId: "", slotId: "" });
+  const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
+  const [deletingSlots, setDeletingSlots] = useState(false);
 
   const [loadedTabs, setLoadedTabs] = useState<Set<Tab>>(new Set());
 
@@ -652,6 +654,28 @@ export default function AdminPage() {
     else {
       const err = await res.json().catch(() => null);
       alert(err?.message || `Failed (${res.status})`);
+    }
+  };
+
+  const handleBulkDeleteSlots = async () => {
+    if (selectedSlots.size === 0) return;
+    const toDelete = slots.filter(s => selectedSlots.has(s._id));
+    const bookedCount = toDelete.filter(s => s.isBooked).length;
+    const msg = bookedCount > 0
+      ? `Delete ${selectedSlots.size} slot(s)? ${bookedCount} are booked — those will also be deleted.`
+      : `Delete ${selectedSlots.size} slot(s)?`;
+    if (!confirm(msg)) return;
+    setDeletingSlots(true);
+    try {
+      await Promise.all([...selectedSlots].map(id =>
+        fetch(`/api/consultation/slots?id=${id}`, { method: 'DELETE' })
+      ));
+      setSlots(prev => prev.filter(s => !selectedSlots.has(s._id)));
+      setSelectedSlots(new Set());
+    } catch (err) {
+      alert('Some slots could not be deleted.');
+    } finally {
+      setDeletingSlots(false);
     }
   };
 
@@ -1507,50 +1531,129 @@ export default function AdminPage() {
           </Card>
 
           <Card>
-            <h3 className="mb-4 font-semibold">Slots ({slots.length})</h3>
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <h3 className="font-semibold">Slots ({slots.length})</h3>
+                {slots.length > 0 && (
+                  <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={slots.length > 0 && slots.every(s => selectedSlots.has(s._id))}
+                      onChange={() => {
+                        if (slots.every(s => selectedSlots.has(s._id))) {
+                          setSelectedSlots(new Set());
+                        } else {
+                          setSelectedSlots(new Set(slots.map(s => s._id)));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    {locale === 'ko' ? '전체 선택' : 'Select All'}
+                  </label>
+                )}
+              </div>
+              {selectedSlots.size > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">{selectedSlots.size} {locale === 'ko' ? '개 선택됨' : 'selected'}</span>
+                  <button
+                    onClick={handleBulkDeleteSlots}
+                    disabled={deletingSlots}
+                    className="rounded bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+                  >
+                    {deletingSlots ? (locale === 'ko' ? '삭제 중...' : 'Deleting...') : (locale === 'ko' ? '선택 삭제' : 'Delete Selected')}
+                  </button>
+                  <button
+                    onClick={() => setSelectedSlots(new Set())}
+                    className="rounded border px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    {locale === 'ko' ? '해제' : 'Clear'}
+                  </button>
+                </div>
+              )}
+            </div>
+
             {slots.length === 0 ? (
               <p className="text-gray-500">No slots available.</p>
             ) : (
-              <div className="grid gap-2">
-                {slots.map(slot => (
-                  <div key={slot._id} className="flex items-start justify-between border-b py-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{slot.topic}</span>
-                        <Badge tone={slot.isBooked ? "gray" : "green"}>{slot.isBooked ? "Booked" : "Available"}</Badge>
-                      </div>
-                      <p className="text-sm text-gray-600">Instructor: {slot.instructorId?.name || '—'}</p>
-                      <p className="text-sm text-gray-700">{new Date(slot.startsAt).toLocaleDateString(locale)} {new Date(slot.startsAt).toLocaleTimeString(locale, {hour: '2-digit', minute: '2-digit', hour12: false})} — {new Date(slot.endsAt).toLocaleTimeString(locale, {hour: '2-digit', minute: '2-digit', hour12: false})}</p>
-                    </div>
-                    <div className="space-x-2">
-                      <button onClick={() => {
-                        setEditingSlot(editingSlot === slot._id ? null : slot._id);
-                        const toLocalDT = (iso: string) => {
-                          const d = new Date(iso);
-                          const pad = (n: number) => String(n).padStart(2, '0');
-                          return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-                        };
-                        setSlotEditForm({ startsAt: toLocalDT(slot.startsAt), endsAt: toLocalDT(slot.endsAt), topic: slot.topic });
-                      }} className="text-blue-600 hover:underline text-sm">Edit</button>
-                      {!slot.isBooked && <button onClick={() => handleDeleteSlot(slot._id)} className="text-red-600 hover:underline text-sm">Delete</button>}
-                    </div>
-                  </div>
-                ))}
-
-                {editingSlot && (
-                  <div className="mt-2">
-                    <h4 className="font-medium">Edit Slot</h4>
-                    <div className="grid gap-2 sm:grid-cols-3 mt-2">
-                      <Input type="datetime-local" value={slotEditForm.startsAt} onChange={e => setSlotEditForm({...slotEditForm, startsAt: e.target.value})} />
-                      <Input type="datetime-local" value={slotEditForm.endsAt} onChange={e => setSlotEditForm({...slotEditForm, endsAt: e.target.value})} />
-                      <Input placeholder="Topic" value={slotEditForm.topic} onChange={e => setSlotEditForm({...slotEditForm, topic: e.target.value})} />
-                    </div>
-                    <div className="mt-2">
-                      <Button onClick={handleEditSlot}>Save changes</Button>
-                      <button onClick={() => { setEditingSlot(null); setSlotEditForm({ startsAt: '', endsAt: '', topic: '' }); }} className="ml-2 text-gray-600 hover:underline">Cancel</button>
-                    </div>
-                  </div>
-                )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b">
+                      <th className="px-3 py-2 w-10"></th>
+                      <th className="text-left px-3 py-2 font-semibold text-gray-700">{locale === 'ko' ? '주제' : 'Topic'}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-gray-700">{locale === 'ko' ? '강사' : 'Instructor'}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-gray-700">{locale === 'ko' ? '날짜/시간' : 'Date / Time'}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-gray-700">{locale === 'ko' ? '상태' : 'Status'}</th>
+                      <th className="px-3 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {slots.map(slot => {
+                      const isSelected = selectedSlots.has(slot._id);
+                      const toLocalDT = (iso: string) => {
+                        const d = new Date(iso);
+                        const pad = (n: number) => String(n).padStart(2, '0');
+                        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                      };
+                      return (
+                        <>
+                          <tr key={slot._id} className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : ''}`}>
+                            <td className="px-3 py-2">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => setSelectedSlots(prev => {
+                                  const s = new Set(prev);
+                                  s.has(slot._id) ? s.delete(slot._id) : s.add(slot._id);
+                                  return s;
+                                })}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                              />
+                            </td>
+                            <td className="px-3 py-2 font-medium text-gray-900">{slot.topic}</td>
+                            <td className="px-3 py-2 text-gray-600">{slot.instructorId?.name || '—'}</td>
+                            <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
+                              {new Date(slot.startsAt).toLocaleDateString(locale)}{' '}
+                              {new Date(slot.startsAt).toLocaleTimeString(locale, {hour: '2-digit', minute: '2-digit', hour12: false})}
+                              {' — '}
+                              {new Date(slot.endsAt).toLocaleTimeString(locale, {hour: '2-digit', minute: '2-digit', hour12: false})}
+                            </td>
+                            <td className="px-3 py-2">
+                              <Badge tone={slot.isBooked ? "gray" : "green"}>{slot.isBooked ? "Booked" : "Available"}</Badge>
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    setEditingSlot(editingSlot === slot._id ? null : slot._id);
+                                    setSlotEditForm({ startsAt: toLocalDT(slot.startsAt), endsAt: toLocalDT(slot.endsAt), topic: slot.topic });
+                                  }}
+                                  className="text-blue-600 hover:underline text-sm"
+                                >Edit</button>
+                                <button onClick={() => handleDeleteSlot(slot._id)} className="text-red-600 hover:underline text-sm">Delete</button>
+                              </div>
+                            </td>
+                          </tr>
+                          {editingSlot === slot._id && (
+                            <tr key={`${slot._id}-edit`}>
+                              <td colSpan={6} className="px-3 py-3 bg-gray-50 border-b">
+                                <div className="grid gap-2 sm:grid-cols-3">
+                                  <Input type="datetime-local" value={slotEditForm.startsAt} onChange={e => setSlotEditForm({...slotEditForm, startsAt: e.target.value})} />
+                                  <Input type="datetime-local" value={slotEditForm.endsAt} onChange={e => setSlotEditForm({...slotEditForm, endsAt: e.target.value})} />
+                                  <Input placeholder="Topic" value={slotEditForm.topic} onChange={e => setSlotEditForm({...slotEditForm, topic: e.target.value})} />
+                                </div>
+                                <div className="mt-2 flex gap-2">
+                                  <Button onClick={handleEditSlot}>Save</Button>
+                                  <button onClick={() => { setEditingSlot(null); setSlotEditForm({ startsAt: '', endsAt: '', topic: '' }); }} className="text-gray-600 hover:underline text-sm">Cancel</button>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </Card>
