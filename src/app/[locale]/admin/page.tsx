@@ -1001,7 +1001,6 @@ export default function AdminPage() {
                 <div className="flex items-start gap-4">
                   {programImagePreview ? (
                     <div className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={programImagePreview} alt="Preview" className="w-32 h-24 object-cover rounded border" />
                       <button
                         type="button"
@@ -1078,7 +1077,6 @@ export default function AdminPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       {(program as any).imageUrl && (
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={(program as any).imageUrl} alt="" className="w-12 h-12 object-cover rounded" />
                       )}
                       <div>
@@ -1148,7 +1146,6 @@ export default function AdminPage() {
                           <div className="flex items-start gap-4">
                             {programEditForm.imageUrl ? (
                               <div className="relative">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={programEditForm.imageUrl} alt="Preview" className="w-24 h-18 object-cover rounded border" />
                                 <button
                                   type="button"

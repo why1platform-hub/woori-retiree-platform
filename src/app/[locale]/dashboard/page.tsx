@@ -164,9 +164,9 @@ export default function DashboardPage() {
                 {top3Notices.map(n => (
                   <div key={n._id} className="py-3 first:pt-0 last:pb-0">
                     <div className="flex items-start gap-2">
-                      <Badge tone={n.badge === 'urgent' ? 'orange' : 'blue'} className="mt-0.5 flex-shrink-0">
+                      <span className={`mt-0.5 flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${n.badge === 'urgent' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
                         {n.badge === 'urgent' ? T.urgent : T.info}
-                      </Badge>
+                      </span>
                       <div className="min-w-0">
                         <p className="font-medium text-sm text-gray-800 line-clamp-1">{n.title}</p>
                         <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
