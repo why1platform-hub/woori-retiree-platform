@@ -532,9 +532,44 @@ export default function ConsultationPage() {
                     </h3>
 
                     {slotsOnSelectedDate.length === 0 ? (
-                      <p className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center">
-                        {locale === 'ko' ? '이 날짜에 예약 가능한 시간이 없습니다.' : 'No available slots on this date.'}
-                      </p>
+                      <div className="bg-gray-50 rounded-lg p-4 text-center">
+                        <p className="text-sm text-gray-600 font-medium">
+                          {locale === 'ko' ? '선택한 강사는 이 날짜에 예약 가능한 시간이 없습니다.' : 'Selected instructor has no slots on this date.'}
+                        </p>
+                        {otherInstructorsOnDate.length > 0 && (
+                          <div className="mt-3 text-left">
+                            <p className="text-xs font-semibold text-blue-700 mb-2 text-center">
+                              {locale === 'ko' ? '↓ 다른 강사는 이 날짜에 예약 가능합니다' : '↓ Other instructors are available on this date'}
+                            </p>
+                            <div className="grid gap-2">
+                              {otherInstructorsOnDate.map(({ instructor, slots: iSlots }) => (
+                                <div key={instructor._id} className="rounded-xl border border-blue-100 bg-white p-3">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div>
+                                      <p className="font-semibold text-sm text-gray-900">{instructor.name}</p>
+                                      <p className="text-xs text-green-600">{iSlots.length} {locale === 'ko' ? '슬롯 가능' : 'slots available'}</p>
+                                    </div>
+                                    <button
+                                      onClick={() => setSelectedInstructor(instructor._id)}
+                                      className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
+                                    >
+                                      {locale === 'ko' ? '강사 변경' : 'Switch'}
+                                    </button>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {iSlots.slice(0, 5).map((s: any) => (
+                                      <span key={s._id} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                                        {new Date(s.startsAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                      </span>
+                                    ))}
+                                    {iSlots.length > 5 && <span className="text-xs text-gray-400">+{iSlots.length - 5}</span>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <div className="grid gap-2">
                         {slotsOnSelectedDate.map(s => {

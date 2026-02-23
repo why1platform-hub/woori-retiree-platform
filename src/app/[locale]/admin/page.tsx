@@ -163,8 +163,9 @@ export default function AdminPage() {
 
   // Slot form state
   const [slotForm, setSlotForm] = useState({
-    instructorId: "", date: "", startTime: "09:00", endTime: "17:00", topic: "General"
+    instructorId: "", date: "", endDate: "", startTime: "09:00", endTime: "17:00", topic: "General"
   });
+  const [adminSlotDays, setAdminSlotDays] = useState<number[]>([]);
 
   // Course edit state
   const [editingCourse, setEditingCourse] = useState<string | null>(null);
@@ -647,11 +648,14 @@ export default function AdminPage() {
     e.preventDefault();
     const payload: any = { date: slotForm.date, startTime: slotForm.startTime, endTime: slotForm.endTime, topic: slotForm.topic };
     if (slotForm.instructorId) payload.instructorId = slotForm.instructorId;
+    if (slotForm.endDate) payload.endDate = slotForm.endDate;
+    if (adminSlotDays.length > 0) payload.days = adminSlotDays;
     const res = await fetch('/api/consultation/slots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (res.ok) {
       const data = await res.json();
       setSlots([...data.slots, ...slots]);
-      setSlotForm({ instructorId: '', date: '', startTime: '09:00', endTime: '17:00', topic: 'General' });
+      setSlotForm({ instructorId: '', date: '', endDate: '', startTime: '09:00', endTime: '17:00', topic: 'General' });
+      setAdminSlotDays([]);
       alert(`Created ${data.count} slots`);
     } else {
       const err = await res.json().catch(() => null);
@@ -1782,17 +1786,77 @@ export default function AdminPage() {
       {activeTab === "consultations" && (
         <div className="grid gap-4">
           <Card>
-            <h3 className="mb-4 font-semibold">Create Slots</h3>
-            <form onSubmit={handleCreateSlot} className="grid gap-3 sm:grid-cols-4">
-              <select value={slotForm.instructorId} onChange={e => setSlotForm({...slotForm, instructorId: e.target.value})} className="rounded border px-3 py-2">
-                <option value="">{locale === 'ko' ? '강사 선택' : 'Select Instructor'}</option>
-                {instructors.map(ins => <option key={ins._id} value={ins._id}>{ins.name} ({ins.email})</option>)}
-              </select>
-              <Input type="date" value={slotForm.date} onChange={e => setSlotForm({...slotForm, date: e.target.value})} required />
-              <TimeSelect value={slotForm.startTime} onChange={(v) => setSlotForm({...slotForm, startTime: v})} className="rounded border px-3 py-2" hour12={false} locale={locale} />
-              <TimeSelect value={slotForm.endTime} onChange={(v) => setSlotForm({...slotForm, endTime: v})} className="rounded border px-3 py-2" hour12={false} locale={locale} />
-              <Input placeholder="Topic" value={slotForm.topic} onChange={e => setSlotForm({...slotForm, topic: e.target.value})} />
-              <Button type="submit">Create Slots</Button>
+            <h3 className="mb-4 font-semibold">{locale === 'ko' ? '상담 슬롯 생성' : 'Create Consultation Slots'}</h3>
+            <form onSubmit={handleCreateSlot} className="grid gap-3">
+              {/* Instructor selector */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{locale === 'ko' ? '강사 선택' : 'Instructor'}</label>
+                <select value={slotForm.instructorId} onChange={e => setSlotForm({...slotForm, instructorId: e.target.value})} className="rounded border px-3 py-2 w-full">
+                  <option value="">{locale === 'ko' ? '강사를 선택하세요' : 'Select Instructor'}</option>
+                  {instructors.map(ins => <option key={ins._id} value={ins._id}>{ins.name} ({ins.email})</option>)}
+                </select>
+              </div>
+              {/* Date range */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{locale === 'ko' ? '시작 날짜' : 'Start Date'}</label>
+                  <Input type="date" value={slotForm.date} onChange={e => setSlotForm({...slotForm, date: e.target.value})} required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{locale === 'ko' ? '종료 날짜 (선택)' : 'End Date (optional)'}</label>
+                  <Input type="date" value={slotForm.endDate} onChange={e => setSlotForm({...slotForm, endDate: e.target.value})} min={slotForm.date} />
+                </div>
+              </div>
+              {/* Time range */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{locale === 'ko' ? '시작 시간' : 'Start Time'}</label>
+                  <TimeSelect value={slotForm.startTime} onChange={(v) => setSlotForm({...slotForm, startTime: v})} className="rounded border px-3 py-2 w-full" hour12={false} locale={locale} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{locale === 'ko' ? '종료 시간' : 'End Time'}</label>
+                  <TimeSelect value={slotForm.endTime} onChange={(v) => setSlotForm({...slotForm, endTime: v})} className="rounded border px-3 py-2 w-full" hour12={false} locale={locale} />
+                </div>
+              </div>
+              {/* Topic */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{locale === 'ko' ? '주제' : 'Topic'}</label>
+                <Input placeholder={locale === 'ko' ? '예: 취업 상담' : 'e.g. Career Advice'} value={slotForm.topic} onChange={e => setSlotForm({...slotForm, topic: e.target.value})} />
+              </div>
+              {/* Day of week selector (only shown when endDate is set) */}
+              {slotForm.endDate && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {locale === 'ko' ? '반복 요일 (비어있으면 매일)' : 'Repeat on days (empty = every day)'}
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { v: 0, ko: '일', en: 'Sun' },
+                      { v: 1, ko: '월', en: 'Mon' },
+                      { v: 2, ko: '화', en: 'Tue' },
+                      { v: 3, ko: '수', en: 'Wed' },
+                      { v: 4, ko: '목', en: 'Thu' },
+                      { v: 5, ko: '금', en: 'Fri' },
+                      { v: 6, ko: '토', en: 'Sat' },
+                    ].map(day => (
+                      <button key={day.v} type="button"
+                        onClick={() => setAdminSlotDays(prev => prev.includes(day.v) ? prev.filter(d => d !== day.v) : [...prev, day.v])}
+                        className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${adminSlotDays.includes(day.v) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'}`}
+                      >
+                        {locale === 'ko' ? day.ko : day.en}
+                      </button>
+                    ))}
+                  </div>
+                  {slotForm.date && slotForm.endDate && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      {locale === 'ko'
+                        ? `${slotForm.date} ~ ${slotForm.endDate} 기간 동안 ${adminSlotDays.length > 0 ? '선택된 요일에' : '매일'} 슬롯이 생성됩니다.`
+                        : `Slots will be created ${adminSlotDays.length > 0 ? 'on selected days' : 'every day'} from ${slotForm.date} to ${slotForm.endDate}.`}
+                    </p>
+                  )}
+                </div>
+              )}
+              <Button type="submit">{locale === 'ko' ? '슬롯 생성' : 'Create Slots'}</Button>
             </form>
           </Card>
 
