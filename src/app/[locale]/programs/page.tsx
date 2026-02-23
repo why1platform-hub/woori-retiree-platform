@@ -33,18 +33,21 @@ export default function ProgramsPage() {
   const [activeTab, setActiveTab] = useState<StatusTab>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [programsRes, appsRes, catRes] = await Promise.all([
+        const [programsRes, appsRes, catRes, meRes] = await Promise.all([
           fetch("/api/programs"),
           fetch("/api/applications"),
           fetch("/api/categories"),
+          fetch("/api/me"),
         ]);
         if (programsRes.ok) setPrograms((await programsRes.json()).programs || []);
         if (appsRes.ok) setApplications((await appsRes.json()).applications || []);
         if (catRes.ok) setCategories((await catRes.json()).categories || []);
+        if (meRes.ok) { const d = await meRes.json(); setUserRole(d.user?.role || null); }
       } catch (err) {
         console.error("Error fetching programs:", err);
       } finally {
@@ -53,6 +56,8 @@ export default function ProgramsPage() {
     }
     fetchData();
   }, []);
+
+  const isSuperAdmin = userRole === 'superadmin';
 
   const getCategoryLabel = (name: string) => categories.find(c => c.name === name)?.label || name;
 
@@ -186,7 +191,7 @@ export default function ProgramsPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="max-w-sm"
             />
-            {selected.size > 0 && (
+            {isSuperAdmin && selected.size > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600">
                   {locale === 'ko' ? `${selected.size}개 선택됨` : `${selected.size} selected`}
@@ -220,15 +225,17 @@ export default function ProgramsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b">
-                    <th className="px-4 py-3 w-10">
-                      <input
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={toggleAll}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                        title={locale === 'ko' ? '전체 선택' : 'Select all'}
-                      />
-                    </th>
+                    {isSuperAdmin && (
+                      <th className="px-4 py-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          onChange={toggleAll}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          title={locale === 'ko' ? '전체 선택' : 'Select all'}
+                        />
+                      </th>
+                    )}
                     <th className="text-left px-4 py-3 font-semibold text-gray-700">{locale === 'ko' ? '프로그램명' : 'Program'}</th>
                     <th className="text-left px-4 py-3 font-semibold text-gray-700">{locale === 'ko' ? '분야' : 'Field'}</th>
                     <th className="text-left px-4 py-3 font-semibold text-gray-700">{locale === 'ko' ? '모집기간' : 'Period'}</th>
@@ -243,14 +250,16 @@ export default function ProgramsPage() {
                     const isSelected = selected.has(p._id);
                     return (
                       <tr key={p._id} className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : ''}`}>
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleOne(p._id)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                          />
-                        </td>
+                        {isSuperAdmin && (
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleOne(p._id)}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            />
+                          </td>
+                        )}
                         <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
                         <td className="px-4 py-3">
                           <span className="px-2 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700">

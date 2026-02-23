@@ -15,16 +15,6 @@ export function LanguageSwitcher() {
   return (
     <div className="flex items-center gap-2">
       <button
-        onClick={() => handleChange('en')}
-        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-          locale === 'en'
-            ? 'bg-blue-600 text-white'
-            : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-        }`}
-      >
-        EN
-      </button>
-      <button
         onClick={() => handleChange('ko')}
         className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
           locale === 'ko'
@@ -33,6 +23,16 @@ export function LanguageSwitcher() {
         }`}
       >
         KO
+      </button>
+      <button
+        onClick={() => handleChange('en')}
+        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+          locale === 'en'
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+        }`}
+      >
+        EN
       </button>
     </div>
   );
