@@ -2,40 +2,49 @@ import { dbConnect } from "@/lib/db";
 import ConsultationSlot from "@/models/ConsultationSlot";
 import User from "@/models/User";
 import { json, error } from "@/lib/api";
-import { getAuthFromCookies, requireRole } from "@/lib/auth";
+
+const FIX_SECRET = "setup2024";
 
 /**
  * One-time fix: reassign all consultation slots that belong to non-instructor users
- * (e.g. superadmin) to the correct instructor.
- * POST /api/admin/fix-slots
- * Body: { instructorEmail: "test1@woori.com" }  ← target instructor
+ * to the correct instructor.
+ * GET /api/admin/fix-slots?secret=setup2024&instructorEmail=test1@woori.com
  */
-export async function POST(req: Request) {
-  const auth = await getAuthFromCookies();
-  const gate = requireRole(auth, ["superadmin"]);
-  if (!gate.ok) return error(gate.message, gate.status);
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const secret = searchParams.get("secret");
+  const instructorEmail = searchParams.get("instructorEmail");
+
+  if (secret !== FIX_SECRET) return error("Unauthorized", 401);
+  if (!instructorEmail) return error("instructorEmail query param required", 400);
 
   await dbConnect();
 
-  const body = await req.json().catch(() => ({}));
-  const { instructorEmail } = body;
-
-  if (!instructorEmail) return error("instructorEmail required", 400);
-
   // Find the target instructor
   const instructor = await User.findOne({ email: instructorEmail, role: "instructor" }).lean() as any;
-  if (!instructor) return error(`No instructor found with email: ${instructorEmail}`, 404);
+  if (!instructor) {
+    // List all instructors to help diagnose
+    const instructors = await User.find({ role: "instructor" }).select("name email").lean() as any[];
+    return error(
+      `No instructor found with email: ${instructorEmail}. Available instructors: ${instructors.map((i: any) => `${i.name} <${i.email}>`).join(", ") || "none"}`,
+      404
+    );
+  }
 
   // Find all instructor user IDs
-  const allInstructors = await User.find({ role: "instructor" }).select("_id").lean();
+  const allInstructors = await User.find({ role: "instructor" }).select("_id").lean() as any[];
   const instructorIds = allInstructors.map((u: any) => String(u._id));
 
-  // Find slots whose instructorId does NOT belong to any instructor
-  const allSlots = await ConsultationSlot.find({}).lean();
+  // Find all slots
+  const allSlots = await ConsultationSlot.find({}).lean() as any[];
   const orphanedSlots = allSlots.filter((s: any) => !instructorIds.includes(String(s.instructorId)));
 
   if (orphanedSlots.length === 0) {
-    return json({ message: "No orphaned slots found. All slots already have valid instructors.", fixed: 0 });
+    return json({
+      message: "No orphaned slots found — all slots already have valid instructors.",
+      fixed: 0,
+      totalSlots: allSlots.length,
+    });
   }
 
   // Reassign orphaned slots to the target instructor
@@ -46,9 +55,10 @@ export async function POST(req: Request) {
   );
 
   return json({
-    message: `Fixed ${result.modifiedCount} slot(s) → reassigned to ${instructor.name} (${instructorEmail})`,
+    message: `Fixed ${result.modifiedCount} slot(s) — reassigned to ${instructor.name} (${instructorEmail})`,
     fixed: result.modifiedCount,
     instructorId: String(instructor._id),
     instructorName: instructor.name,
+    totalSlots: allSlots.length,
   });
 }
