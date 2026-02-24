@@ -29,3 +29,6 @@ instructor_cookies.txt
 *.md
 !README.md
 !.env.example
+
+.vercel
+.env*.local
